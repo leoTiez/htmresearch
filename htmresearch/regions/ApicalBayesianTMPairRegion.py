@@ -318,10 +318,8 @@ class ApicalTMPairRegion(PyRegion):
 
                # TM params
                cellsPerColumn=32,
-               # TODO unnecessary?
-               activationThreshold=13,
                initialPermanence=0.21,
-               # TODO unnecessary?
+               # TODO Does it need to be changed to float?
                minThreshold=10,
                # TODO unnecessary?
                reducedBasalThreshold=13, # ApicalTiebreak and ApicalDependent only
@@ -347,7 +345,6 @@ class ApicalTMPairRegion(PyRegion):
 
     # TM params
     self.cellsPerColumn = cellsPerColumn
-    self.activationThreshold = activationThreshold
     self.reducedBasalThreshold = reducedBasalThreshold
     self.initialPermanence = initialPermanence
     self.minThreshold = minThreshold
@@ -380,7 +377,6 @@ class ApicalTMPairRegion(PyRegion):
         "basalInputSize": self.basalInputWidth,
         "apicalInputSize": self.apicalInputWidth,
         "cellsPerColumn": self.cellsPerColumn,
-        "activationThreshold": self.activationThreshold,
         "initialPermanence": self.initialPermanence,
         "minThreshold": self.minThreshold,
         "sampleSize": self.sampleSize,
@@ -402,6 +398,11 @@ class ApicalTMPairRegion(PyRegion):
 
         import htmresearch.algorithms.apical_tiebreak_temporal_memory
         cls = htmresearch.algorithms.apical_tiebreak_temporal_memory.ApicalTiebreakPairMemory
+
+      elif self.implementation == "BayesianApicalTiebreak":
+
+        import htmresearch.algorithms.apical_tiebreak_bayesian_temporal_memory
+        cls = htmresearch.algorithms.apical_tiebreak_bayesian_temporal_memory.ApicalTiebreakBayesianPairMemory
 
       elif self.implementation == "ApicalDependent":
         params["reducedBasalThreshold"] = self.reducedBasalThreshold
