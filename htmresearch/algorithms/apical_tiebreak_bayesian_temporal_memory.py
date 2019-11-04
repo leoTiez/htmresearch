@@ -62,6 +62,8 @@ class ApicalTiebreakTemporalMemory(object):
                # Changed to float
                minThreshold=0.5,
                sampleSize=20,
+               noise=0.01,
+               learning_rate=0.1,
                # TODO unnecessary?
                basalPredictedSegmentDecrement=0.0,
                # TODO unnecessary?
@@ -126,6 +128,12 @@ class ApicalTiebreakTemporalMemory(object):
     # +1 for bias term
     self.basalWeigths = np.zeros((maxSegmentsPerCell, columnCount*cellsPerColumn, basalInputSize + 1))
     self.apicalWeights = np.zeros((maxSegmentsPerCell, columnCount*cellsPerColumn, apicalInputSize + 1))
+
+    self.basalMovingAverages = np.zeros((maxSegmentsPerCell, columnCount * cellsPerColumn, basalInputSize + 1))
+    self.apicalMovingAverages = np.zeros((maxSegmentsPerCell, columnCount * cellsPerColumn, apicalInputSize + 1))
+
+    self.noise = noise
+    self.learningRate = learning_rate
 
     self.rng = Random(seed)
     self.activeCells = np.empty(0, dtype="uint32")
@@ -220,7 +228,8 @@ class ApicalTiebreakTemporalMemory(object):
     # List of active columns is expected to be an array with indices
     all_columns = np.arange(0, self.numberOfColumns())
     inactive_columns_mask = np.setdiff1d(all_columns, activeColumns)
-    self.predictedCells[inactive_columns_mask, :] = 0
+    correctPredictedCells = self.predictedCells.copy()
+    correctPredictedCells.reshape(self.numberOfColumns(), self.cellsPerColumn)[inactive_columns_mask, :] = 0
 
     # Calculate learning
     (learningActiveBasalSegments,
@@ -332,7 +341,21 @@ class ApicalTiebreakTemporalMemory(object):
       Cells that have learning basal segments or are selected to grow a basal
       segment
     """
+    # Updating of the moving averages
+    noisy_connection_matrix = np.outer(
+      (1 - self.noise**2) * correctPredictedCells,
+      correctPredictedCells
+    ) + self.noise**2
+    self.basalMovingAverages[:, :, :-1] += self.learningRate * (
+            noisy_connection_matrix - self.basalMovingAverages[:, :, :-1]
+    )
+    noisy_activation_vector = (1 - self.noise) * correctPredictedCells + self.noise
+    self.basalMovingAverages[:, :, -1].reshape(-1)[:] += self.learningRate * (
+            noisy_activation_vector - self.basalMovingAverages[:, :, -1].reshape(-1)
+    )
 
+    # --------------------- Not yet updated
+    # TODO update to new learning approach
     # Correctly predicted columns
     learningActiveBasalSegments = self.basalConnections.filterSegmentsByCell(
       activeBasalSegments, correctPredictedCells)
