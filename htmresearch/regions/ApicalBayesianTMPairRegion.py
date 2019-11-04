@@ -400,7 +400,7 @@ class ApicalTMPairRegion(PyRegion):
         cls = htmresearch.algorithms.apical_tiebreak_temporal_memory.ApicalTiebreakPairMemory
 
       elif self.implementation == "BayesianApicalTiebreak":
-
+        params["maxSegmentsPerCell"] = self.maxSegmentsPerCell
         import htmresearch.algorithms.apical_tiebreak_bayesian_temporal_memory
         cls = htmresearch.algorithms.apical_tiebreak_bayesian_temporal_memory.ApicalTiebreakBayesianPairMemory
 
