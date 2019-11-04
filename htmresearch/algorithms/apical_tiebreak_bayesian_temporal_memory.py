@@ -179,7 +179,7 @@ class ApicalTiebreakTemporalMemory(object):
     activation_basal = self._calculateSegmentActivity(self.apicalWeights, basalInput, self.minThreshold)
 
     predicted_cells = self._calculatePredictedCells(activation_basal, activation_apical)
-    normalisation = np.exp(predicted_cells.reshape((self.numberOfColumns, self.cellsPerColumn))).sum(axis=1)
+    normalisation = np.exp(predicted_cells.reshape((self.numberOfColumns(), self.cellsPerColumn))).sum(axis=1)
     predicted_cells = np.exp(predicted_cells) / normalisation
     predicted_cells[predicted_cells < self.minThreshold] = 0.0
 
@@ -187,7 +187,6 @@ class ApicalTiebreakTemporalMemory(object):
     # TODO necessary to use prediction threshold for apical and basal segment values?
     self.activeBasalSegments = activation_apical
     self.activeApicalSegments = activation_basal
-
 
   def activateCells(self,
                     activeColumns,
@@ -218,15 +217,10 @@ class ApicalTiebreakTemporalMemory(object):
     @param learn (bool)
     Whether to grow / reinforce / punish synapses
     """
-
-    # Calculate active cells
-    (correctPredictedCells,
-     burstingColumns) = np2.setCompare(self.predictedCells, activeColumns,
-                                       self.predictedCells / self.cellsPerColumn,
-                                       rightMinusLeft=True)
-    newActiveCells = np.concatenate((correctPredictedCells,
-                                     np2.getAllCellsInColumns(
-                                       burstingColumns, self.cellsPerColumn)))
+    # List of active columns is expected to be an array with indices
+    all_columns = np.arange(0, self.numberOfColumns())
+    inactive_columns_mask = np.setdiff1d(all_columns, activeColumns)
+    self.predictedCells[inactive_columns_mask, :] = 0
 
     # Calculate learning
     (learningActiveBasalSegments,
