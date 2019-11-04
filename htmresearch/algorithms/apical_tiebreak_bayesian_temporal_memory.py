@@ -59,13 +59,14 @@ class ApicalTiebreakTemporalMemory(object):
                # TODO unnecessary?
                reducedBasalThreshold=13,
                initialPermanence=0.21,
-               # TODO Does it need to be updated to float?
-               minThreshold=10,
+               # Changed to float
+               minThreshold=0.5,
                sampleSize=20,
                # TODO unnecessary?
                basalPredictedSegmentDecrement=0.0,
                # TODO unnecessary?
                apicalPredictedSegmentDecrement=0.0,
+               maxSegmentsPerCell=255,
                # TODO check negative one?
                maxSynapsesPerSegment=-1,
                seed=42):
@@ -121,13 +122,10 @@ class ApicalTiebreakTemporalMemory(object):
     self.maxSynapsesPerSegment = maxSynapsesPerSegment
 
     # We use a continuous weight matrix
+    # Three dimensional to have weight from every input to every segment
     # +1 for bias term
-    self.basalWeigths = np.full((columnCount*cellsPerColumn, basalInputSize + 1), self.initialPermanence)
-    self.apicalWeights = np.full((columnCount*cellsPerColumn, apicalInputSize + 1), self.initialPermanence)
-
-    # Use connection matrix to have a proper mapping from segments to cells implemented in C++ library
-    self.basalConnections = SparseMatrixConnections(columnCount*cellsPerColumn, basalInputSize)
-    self.apicalConnections = SparseMatrixConnections(columnCount*cellsPerColumn, apicalInputSize)
+    self.basalWeigths = np.zeros((maxSegmentsPerCell, columnCount*cellsPerColumn, basalInputSize + 1))
+    self.apicalWeights = np.zeros((maxSegmentsPerCell, columnCount*cellsPerColumn, apicalInputSize + 1))
 
     self.rng = Random(seed)
     self.activeCells = np.empty(0, dtype="uint32")
@@ -160,7 +158,7 @@ class ApicalTiebreakTemporalMemory(object):
     self.basalPotentialOverlaps = np.empty(0, dtype="int32")
     self.apicalPotentialOverlaps = np.empty(0, dtype="int32")
 
-  def depolarizeCells(self, basalInput, apicalInput, learn):
+  def depolarizeCells(self, basalInput, apicalInput, learn=None):
     """
     Calculate predictions.
 
@@ -177,26 +175,18 @@ class ApicalTiebreakTemporalMemory(object):
     Whether learning is enabled. Some TM implementations may depolarize cells
     differently or do segment activity bookkeeping when learning is enabled.
     """
-    activation_apical = self._calculateSegmentActivity(self.apicalConnections, apicalInput, self.minThreshold)
+    activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.minThreshold)
+    activation_basal = self._calculateSegmentActivity(self.apicalWeights, basalInput, self.minThreshold)
 
-    # Internal mapping from segment to cell in C++
-    # TODO Is this necessary? We do not use reduced basal threshold?!
-    # if learn or self.useApicalModulationBasalThreshold == False:
-    #   reducedBasalThresholdCells = ()
-    # else:
-    #   reducedBasalThresholdCells = self.apicalConnections.mapSegmentsToCells(activeApicalSegments)
+    predicted_cells = self._calculatePredictedCells(activation_basal, activation_apical)
+    normalisation = np.exp(predicted_cells.reshape((self.numberOfColumns, self.cellsPerColumn))).sum(axis=1)
+    predicted_cells = np.exp(predicted_cells) / normalisation
+    predicted_cells[predicted_cells < self.minThreshold] = 0.0
 
-    activation_basal = self._calculateSegmentActivity(self.basalConnections, basalInput, self.minThreshold)
-    predictedCells = self._calculatePredictedCells(activation_basal,
-                                                   activation_apical)
-
-    self.predictedCells = predictedCells
-    self.activeBasalSegments = activeBasalSegments
-    self.activeApicalSegments = activeApicalSegments
-    self.matchingBasalSegments = matchingBasalSegments
-    self.matchingApicalSegments = matchingApicalSegments
-    self.basalPotentialOverlaps = basalPotentialOverlaps
-    self.apicalPotentialOverlaps = apicalPotentialOverlaps
+    self.predictedCells = predicted_cells
+    # TODO necessary to use prediction threshold for apical and basal segment values?
+    self.activeBasalSegments = activation_apical
+    self.activeApicalSegments = activation_basal
 
 
   def activateCells(self,
@@ -496,24 +486,13 @@ class ApicalTiebreakTemporalMemory(object):
     When a cell has both types of segments active, other cells in its minicolumn
     must also have both types of segments to be considered predictive.
 
-    @param activeBasalSegments (numpy array)
-    @param activeApicalSegments (numpy array)
+    @param activeBasalSegments (numpy array) two dimensional (segments x cells)
+    @param activeApicalSegments (numpy array) two dimentsional (segments x cells)
 
     @return (numpy array)
     """
-    # TODO does this work?
-    # According to C++ code this shoult return the cells for the segments only
-    # This is done via an iterator, hence should be independent of the values in the array
-    # TODO does the function return indices?
-    cellsForBasalSegments = self.basalConnections.mapSegmentsToCells(activeBasalSegments)
-
-    unique_max, idx = np.unique(
-      np.asarray(
-        [np.max(activeBasalSegments[cellsForBasalSegments==cell]) for cell in cellsForBasalSegments]
-      ),
-      return_index=True)
-    max_cells = unique_max[np.sort(idx)]
-    max_cells += activeApicalSegments
+    max_cells = activeBasalSegments.max(axis=0)
+    max_cells += activeApicalSegments.max(axis=0)
 
     # TODO what does this line do?
     # if self.useApicalTiebreak == False:
