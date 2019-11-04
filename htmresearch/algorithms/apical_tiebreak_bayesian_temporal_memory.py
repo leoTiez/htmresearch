@@ -228,8 +228,9 @@ class ApicalTiebreakTemporalMemory(object):
     # List of active columns is expected to be an array with indices
     all_columns = np.arange(0, self.numberOfColumns())
     inactive_columns_mask = np.setdiff1d(all_columns, activeColumns)
-    correctPredictedCells = self.predictedCells.copy()
-    correctPredictedCells.reshape(self.numberOfColumns(), self.cellsPerColumn)[inactive_columns_mask, :] = 0
+    correct_predicted_cells = self.predictedCells.copy()
+    correct_predicted_cells.reshape(self.numberOfColumns(), self.cellsPerColumn)[inactive_columns_mask, :] = 0
+    correct_predicted_cells_mask = correct_predicted_cells[correct_predicted_cells > 0]
 
     # Calculate learning
     (learningActiveBasalSegments,
@@ -237,7 +238,7 @@ class ApicalTiebreakTemporalMemory(object):
      basalSegmentsToPunish,
      newBasalSegmentCells,
      learningCells) = self._calculateBasalLearning(
-       activeColumns, burstingColumns, correctPredictedCells,
+       activeColumns, burstingColumns, correct_predicted_cells_mask,
        self.activeBasalSegments, self.matchingBasalSegments,
        self.basalPotentialOverlaps)
 
@@ -304,7 +305,7 @@ class ApicalTiebreakTemporalMemory(object):
   def _calculateBasalLearning(self,
                               activeColumns,
                               burstingColumns,
-                              correctPredictedCells,
+                              correctPredictedCellsMask,
                               activeBasalSegments,
                               matchingBasalSegments,
                               basalPotentialOverlaps):
@@ -342,14 +343,17 @@ class ApicalTiebreakTemporalMemory(object):
       segment
     """
     # Updating of the moving averages
+
     noisy_connection_matrix = np.outer(
-      (1 - self.noise**2) * correctPredictedCells,
-      correctPredictedCells
+      (1 - self.noise**2) * activeBasalSegments,
+      activeBasalSegments
     ) + self.noise**2
+    noisy_connection_matrix[:, ~correctPredictedCellsMask, :] *= -1
     self.basalMovingAverages[:, :, :-1] += self.learningRate * (
             noisy_connection_matrix - self.basalMovingAverages[:, :, :-1]
     )
-    noisy_activation_vector = (1 - self.noise) * correctPredictedCells + self.noise
+    noisy_activation_vector = (1 - self.noise) * activeBasalSegments + self.noise
+    noisy_activation_vector[:, ~correctPredictedCellsMask, :] *= -1
     self.basalMovingAverages[:, :, -1].reshape(-1)[:] += self.learningRate * (
             noisy_activation_vector - self.basalMovingAverages[:, :, -1].reshape(-1)
     )
