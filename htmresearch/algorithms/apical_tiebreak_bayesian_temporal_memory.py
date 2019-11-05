@@ -122,15 +122,22 @@ class ApicalTiebreakTemporalMemory(object):
     self.basalPredictedSegmentDecrement = basalPredictedSegmentDecrement
     self.apicalPredictedSegmentDecrement = apicalPredictedSegmentDecrement
     self.maxSynapsesPerSegment = maxSynapsesPerSegment
+    self.maxSegmentsPerCell = maxSegmentsPerCell
+    self.basalInputSize = basalInputSize
+    self.apicalInputSize = apicalInputSize
 
     # We use a continuous weight matrix
     # Three dimensional to have weight from every input to every segment
     # +1 for bias term
-    self.basalWeigths = np.zeros((maxSegmentsPerCell, columnCount*cellsPerColumn, basalInputSize + 1))
-    self.apicalWeights = np.zeros((maxSegmentsPerCell, columnCount*cellsPerColumn, apicalInputSize + 1))
+    self.basalWeigths = np.zeros(
+      (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.basalInputSize + 1))
+    self.apicalWeights = np.zeros(
+      (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.apicalInputSize + 1))
 
-    self.basalMovingAverages = np.zeros((maxSegmentsPerCell, columnCount * cellsPerColumn, basalInputSize + 1))
-    self.apicalMovingAverages = np.zeros((maxSegmentsPerCell, columnCount * cellsPerColumn, apicalInputSize + 1))
+    self.basalMovingAverages = np.zeros(
+      (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.basalInputSize + 1))
+    self.apicalMovingAverages = np.zeros(
+      (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.apicalInputSize + 1))
 
     self.noise = noise
     self.learningRate = learning_rate
@@ -242,7 +249,8 @@ class ApicalTiebreakTemporalMemory(object):
     correct_predicted_cells = self.predictedCells.copy()
     correct_predicted_cells.reshape(self.numberOfColumns(), self.cellsPerColumn)[inactive_columns_mask, :] = 0
     correct_predicted_cells_mask = correct_predicted_cells[correct_predicted_cells > 0]
-
+    self.activeBasalSegments[:, ~correct_predicted_cells_mask] = 0
+    self.activeApicalSegments[:, ~correct_predicted_cells_mask] = 0
     # Calculate learning
     (learningActiveBasalSegments,
      learningMatchingBasalSegments,
@@ -357,14 +365,13 @@ class ApicalTiebreakTemporalMemory(object):
 
     noisy_connection_matrix = np.outer(
       (1 - self.noise**2) * activeBasalSegments,
-      activeBasalSegments
-    ) + self.noise**2
-    noisy_connection_matrix[:, ~correctPredictedCellsMask, :] *= -1
+      self.basalInput
+    ).reshape(self.maxSegmentsPerCell, self.numberOfCells(), self.basalInputSize) + self.noise**2
     self.basalMovingAverages[:, :, :-1] += self.learningRate * (
             noisy_connection_matrix - self.basalMovingAverages[:, :, :-1]
     )
-    noisy_activation_vector = (1 - self.noise) * activeBasalSegments + self.noise
-    noisy_activation_vector[:, ~correctPredictedCellsMask, :] *= -1
+
+    noisy_activation_vector = (1 - self.noise) * activeBasalSegments.reshape(-1) + self.noise
     self.basalMovingAverages[:, :, -1].reshape(-1)[:] += self.learningRate * (
             noisy_activation_vector - self.basalMovingAverages[:, :, -1].reshape(-1)
     )
