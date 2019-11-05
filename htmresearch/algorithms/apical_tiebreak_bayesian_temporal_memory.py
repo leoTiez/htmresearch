@@ -159,12 +159,16 @@ class ApicalTiebreakTemporalMemory(object):
     """
     Clear all cell and segment activity.
     """
+    # Changed already to float64
+    self.predictedCells = np.empty(0, dtype="float64")
+    self.activeBasalSegments = np.empty(0, dtype="float64")
+    self.activeApicalSegments = np.empty(0, dtype="float64")
+    self.apicalInput = np.empty(0, dtype="float64")
+    self.basalInput = np.empty(0, dtype="float64")
+    # Still needs to be changed. However, not clear whether they are necessary
     self.activeCells = np.empty(0, dtype="uint32")
     self.winnerCells = np.empty(0, dtype="uint32")
-    self.predictedCells = np.empty(0, dtype="uint32")
     self.predictedActiveCells = np.empty(0, dtype="uint32")
-    self.activeBasalSegments = np.empty(0, dtype="uint32")
-    self.activeApicalSegments = np.empty(0, dtype="uint32")
     self.matchingBasalSegments = np.empty(0, dtype="uint32")
     self.matchingApicalSegments = np.empty(0, dtype="uint32")
     self.basalPotentialOverlaps = np.empty(0, dtype="int32")
