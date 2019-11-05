@@ -136,12 +136,16 @@ class ApicalTiebreakTemporalMemory(object):
     self.learningRate = learning_rate
 
     self.rng = Random(seed)
+    # Changed already to float64
+    self.predictedCells = np.empty(0, dtype="float64")
+    self.activeBasalSegments = np.empty(0, dtype="float64")
+    self.activeApicalSegments = np.empty(0, dtype="float64")
+    self.apicalInput = np.empty(0, dtype="float64")
+    self.basalInput = np.empty(0, dtype="float64")
+    # Still needs to be changed. However, not clear whether they are necessary
     self.activeCells = np.empty(0, dtype="uint32")
     self.winnerCells = np.empty(0, dtype="uint32")
-    self.predictedCells = np.empty(0, dtype="uint32")
     self.predictedActiveCells = np.empty(0, dtype="uint32")
-    self.activeBasalSegments = np.empty(0, dtype="uint32")
-    self.activeApicalSegments = np.empty(0, dtype="uint32")
     self.matchingBasalSegments = np.empty(0, dtype="uint32")
     self.matchingApicalSegments = np.empty(0, dtype="uint32")
     self.basalPotentialOverlaps = np.empty(0, dtype="int32")
@@ -195,6 +199,9 @@ class ApicalTiebreakTemporalMemory(object):
     # TODO necessary to use prediction threshold for apical and basal segment values?
     self.activeBasalSegments = activation_apical
     self.activeApicalSegments = activation_basal
+    # Save basal and apical input values for learning
+    self.basalInput = basalInput
+    self.apicalInput = apicalInput
 
   def activateCells(self,
                     activeColumns,
