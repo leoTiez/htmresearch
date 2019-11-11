@@ -245,24 +245,23 @@ class ApicalTiebreakTemporalMemory(object):
     """
     # List of active columns is expected to be an array with indices
     all_columns = np.arange(0, self.numberOfColumns())
+    # Get all inactive columns and set their respective predicted cells to zero
     inactive_columns_mask = np.setdiff1d(all_columns, activeColumns)
     correct_predicted_cells = self.predictedCells.copy()
     correct_predicted_cells.reshape(self.numberOfColumns(), self.cellsPerColumn)[inactive_columns_mask, :] = 0
-    correct_predicted_cells_mask = correct_predicted_cells[correct_predicted_cells > 0]
+    # find bursting columns
     bursting_columns = np.where(
       np.abs(correct_predicted_cells.reshape(
         self.numberOfColumns(), self.cellsPerColumn)[activeColumns, :].sum(axis=1)
              ) < self.minThreshold)
 
     # TODO move line to apical learning
+    correct_predicted_cells_mask = correct_predicted_cells[correct_predicted_cells > 0]
     self.activeApicalSegments[:, ~correct_predicted_cells_mask] = 0
 
     # Calculate learning
-    (learningActiveBasalSegments,
-     learningMatchingBasalSegments,
-     basalSegmentsToPunish,
-     newBasalSegmentCells,
-     learningCells) = self._calculateBasalLearning(activeColumns, bursting_columns, correct_predicted_cells_mask)
+    # TODO implement update of predicted cells for next calculation step
+    self._calculateBasalLearning(activeColumns, bursting_columns, correct_predicted_cells_mask)
 
     (learningActiveApicalSegments,
      learningMatchingApicalSegments,
