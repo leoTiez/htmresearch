@@ -253,7 +253,8 @@ class ApicalTiebreakTemporalMemory(object):
       np.abs(correct_predicted_cells.reshape(
         self.numberOfColumns(), self.cellsPerColumn)[activeColumns, :].sum(axis=1)
              ) < self.minThreshold)
-    self.activeBasalSegments[:, ~correct_predicted_cells_mask] = 0
+
+    # TODO move line to apical learning
     self.activeApicalSegments[:, ~correct_predicted_cells_mask] = 0
 
     # Calculate learning
@@ -261,10 +262,7 @@ class ApicalTiebreakTemporalMemory(object):
      learningMatchingBasalSegments,
      basalSegmentsToPunish,
      newBasalSegmentCells,
-     learningCells) = self._calculateBasalLearning(
-       activeColumns, bursting_columns, correct_predicted_cells_mask,
-       self.activeBasalSegments, self.matchingBasalSegments,
-       self.basalPotentialOverlaps)
+     learningCells) = self._calculateBasalLearning(activeColumns, bursting_columns, correct_predicted_cells_mask)
 
     (learningActiveApicalSegments,
      learningMatchingApicalSegments,
@@ -329,10 +327,8 @@ class ApicalTiebreakTemporalMemory(object):
   def _calculateBasalLearning(self,
                               activeColumns,
                               burstingColumns,
-                              correctPredictedCellsMask,
-                              activeBasalSegments,
-                              matchingBasalSegments,
-                              basalPotentialOverlaps):
+                              correctPredictedCellsMask
+                              ):
     """
     Basic Temporal Memory learning. Correctly predicted cells always have
     active basal segments, and we learn on these segments. In bursting
@@ -366,48 +362,43 @@ class ApicalTiebreakTemporalMemory(object):
       Cells that have learning basal segments or are selected to grow a basal
       segment
     """
-    # Updating of the moving averages
+    # Calculate bursting columns
+    # This makes sure that only segments are learnt that are active
+    # Reshaping active segments for easy access per column
+    self.activeBasalSegments = self.activeBasalSegments.reshape(
+      self.maxSegmentsPerCell,
+      self.cellsPerColumn,
+      self.numberOfColumns()
+    )
+    # Setting the segment with the maximum value to the min threshold
+    self.activeBasalSegments[
+      np.where(self.activeBasalSegments[:, :, burstingColumns]
+               == self.activeBasalSegments[:, :, burstingColumns].max(axis=0))
+    ] = self.minThreshold
+    # Reshaping active basal segments to its original shape
+    self.activeBasalSegments = self.activeBasalSegments.reshape(
+      self.maxSegmentsPerCell,
+      self.numberOfCells()
+    )
 
+    # All segments of cells with a predicted value below the threshold are set to 0
+    self.activeBasalSegments[:, self.activeBasalSegments.max(axis=0) < self.minThreshold] = 0.0
+
+    # Updating of the moving averages
     noisy_connection_matrix = np.outer(
-      (1 - self.noise**2) * activeBasalSegments,
+      (1 - self.noise**2) * self.activeBasalSegments,
       self.basalInput
     ).reshape(self.maxSegmentsPerCell, self.numberOfCells(), self.basalInputSize) + self.noise**2
     self.basalMovingAverages[:, :, :-1] += self.learningRate * (
             noisy_connection_matrix - self.basalMovingAverages[:, :, :-1]
     )
 
-    noisy_activation_vector = (1 - self.noise) * activeBasalSegments.reshape(-1) + self.noise
+    noisy_activation_vector = (1 - self.noise) * self.activeBasalSegments.reshape(-1) + self.noise
     self.basalMovingAverages[:, :, -1].reshape(-1)[:] += self.learningRate * (
             noisy_activation_vector - self.basalMovingAverages[:, :, -1].reshape(-1)
     )
 
-    # --------------------- Not yet updated
-    # TODO update to new learning approach
-    # Correctly predicted columns
-    learningActiveBasalSegments = self.basalConnections.filterSegmentsByCell(
-      activeBasalSegments, correctPredictedCells)
-
-    cellsForMatchingBasal = self.basalConnections.mapSegmentsToCells(
-      matchingBasalSegments)
-    matchingCells = np.unique(cellsForMatchingBasal)
-
-    (matchingCellsInBurstingColumns,
-     burstingColumnsWithNoMatch) = np2.setCompare(
-       matchingCells, burstingColumns, matchingCells / self.cellsPerColumn,
-       rightMinusLeft=True)
-
-    learningMatchingBasalSegments = self._chooseBestSegmentPerColumn(
-      self.basalConnections, matchingCellsInBurstingColumns,
-      matchingBasalSegments, basalPotentialOverlaps, self.cellsPerColumn)
-    newBasalSegmentCells = self._getCellsWithFewestSegments(
-      self.basalConnections, self.rng, burstingColumnsWithNoMatch,
-      self.cellsPerColumn)
-
-    learningCells = np.concatenate(
-      (correctPredictedCells,
-       self.basalConnections.mapSegmentsToCells(learningMatchingBasalSegments),
-       newBasalSegmentCells))
-
+    # TODO not yet implemented
     # Incorrectly predicted columns
     correctMatchingBasalMask = np.in1d(
       cellsForMatchingBasal / self.cellsPerColumn, activeColumns)
