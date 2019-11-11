@@ -398,20 +398,6 @@ class ApicalTiebreakTemporalMemory(object):
             noisy_activation_vector - self.basalMovingAverages[:, :, -1].reshape(-1)
     )
 
-    # TODO not yet implemented
-    # Incorrectly predicted columns
-    correctMatchingBasalMask = np.in1d(
-      cellsForMatchingBasal / self.cellsPerColumn, activeColumns)
-
-    basalSegmentsToPunish = matchingBasalSegments[~correctMatchingBasalMask]
-
-    return (learningActiveBasalSegments,
-            learningMatchingBasalSegments,
-            basalSegmentsToPunish,
-            newBasalSegmentCells,
-            learningCells)
-
-
   def _calculateApicalLearning(self,
                                learningCells,
                                activeColumns,
