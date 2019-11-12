@@ -241,23 +241,24 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     all_columns = np.arange(0, self.numberOfColumns())
     # Get all inactive columns and set their respective predicted cells to zero
     inactive_columns = np.setdiff1d(all_columns, activeColumns)
-    self.activeCells = self.predictedCells.copy()
-    self.activeCells.reshape(self.numberOfColumns(), self.cellsPerColumn)[inactive_columns, :] = 0
+    self.activeCells = self._reshapeCellsToColumnBased(self.predictedCells.copy())
+    self.activeCells[:, inactive_columns] = 0
     # find bursting columns
     bursting_columns = activeColumns[np.where(
-      np.abs(self.activeCells.reshape(
-        self.numberOfColumns(), self.cellsPerColumn)[activeColumns, :].sum(axis=1)
+      np.abs(self.activeCells[:, activeColumns].sum(axis=1)
              ) < self.minThreshold)]
+    self.activeCells = self._reshapeCellsFromColumnBased(self.activeCells)
 
-    if bursting_columns.shape[0] > 0:
     # Calculate basal segment activity after bursting
+    if bursting_columns.shape[0] > 0:
       self.activeBasalSegments = self._setMaxSegmentsAfterBursting(bursting_columns, self.activeBasalSegments)
       self.activeApicalSegments = self._setMaxSegmentsAfterBursting(bursting_columns, self.activeApicalSegments)
       self.predictedCells = self._calculatePredictedValues(self.activeBasalSegments, self.activeApicalSegments)
 
-    # Reset active cells values
-    self.activeCells = self.predictedCells.copy()
-    self.activeCells.reshape(self.numberOfColumns(), self.cellsPerColumn)[inactive_columns, :] = 0
+      # Reset active cells values
+      self.activeCells = self._reshapeCellsToColumnBased(self.predictedCells.copy())
+      self.activeCells[:, inactive_columns] = 0
+
     # All non-active segments should be set to zero
     self.activeBasalSegments = self._setNonActiveSegments(self.activeBasalSegments, inactive_columns)
     self.activeApicalSegments = self._setNonActiveSegments(self.activeApicalSegments, inactive_columns)
@@ -298,9 +299,9 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
   def _calculatePredictedValues(self, activation_basal, activation_apical):
     predicted_cells = self._calculatePredictedCells(activation_basal, activation_apical)
-    normalisation = np.exp(predicted_cells.reshape((self.numberOfColumns(), self.cellsPerColumn))).sum(axis=1)
-    predicted_cells = (np.exp(predicted_cells.reshape((self.numberOfColumns(), self.cellsPerColumn)))
-                       / normalisation.reshape((normalisation.shape[0], 1))).reshape(-1)
+    normalisation = np.exp(self._reshapeCellsToColumnBased(predicted_cells)).sum(axis=0)
+    predicted_cells = self._reshapeCellsFromColumnBased(np.exp(self._reshapeCellsToColumnBased(predicted_cells))
+                                                        / normalisation.reshape((1, normalisation.shape[0])))
     predicted_cells[predicted_cells < self.minThreshold] = 0.0
     return predicted_cells
 
@@ -341,6 +342,18 @@ class ApicalTiebreakBayesianTemporalMemory(object):
       self.maxSegmentsPerCell,
       self.cellsPerColumn*numOfColumns
     )
+
+  def _reshapeCellsToColumnBased(self, cells, numOfColumns=None):
+    if numOfColumns is None:
+      numOfColumns = self.numberOfColumns()
+
+    return cells.reshape(
+      self.cellsPerColumn,
+      numOfColumns
+    )
+
+  def _reshapeCellsFromColumnBased(self, cells):
+    return cells.reshape(-1)
 
   def _updateMovingAverage(
           self,
