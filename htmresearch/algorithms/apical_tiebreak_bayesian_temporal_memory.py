@@ -372,21 +372,25 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     segments[:, segments.max(axis=0) < self.minThreshold] = 0.0
 
     # Updating moving average weights to input
-    noisy_connection_matrix = np.outer(
-      (1 - self.noise**2) * segments,
-      inputValues
-    ).reshape(self.maxSegmentsPerCell, self.numberOfCells(), inputSize) + self.noise**2
+    noisy_connection_matrix = np.outer((1 - self.noise**2) * segments, inputValues)
+    # Consider only active segments
+    noisy_connection_matrix[noisy_connection_matrix > 0] += self.noise**2
+    noisy_connection_matrix = noisy_connection_matrix.reshape(self.maxSegmentsPerCell, self.numberOfCells(), inputSize)
     movingAverage += learningRate * (
             noisy_connection_matrix - movingAverage
     )
 
     # Updating moving average bias of each segment
-    noisy_activation_vector = (1 - self.noise) * segments + self.noise
+    noisy_activation_vector = (1 - self.noise) * segments
+    # Consider only active segments
+    noisy_activation_vector[noisy_activation_vector > 0] += self.noise
     movingAverageBias += learningRate * (
             noisy_activation_vector - movingAverageBias
     )
     # Updating moving average input activity
-    noisy_input_vector = (1 - self.noise) * inputValues + self.noise
+    noisy_input_vector = (1 - self.noise) * inputValues
+    # Consider only active segments
+    noisy_input_vector[noisy_input_vector > 0] += self.noise
     movingAverageInput += learningRate * (
             noisy_input_vector - movingAverageInput
     )
