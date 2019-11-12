@@ -11,12 +11,16 @@ import apical_tiebreak_bayesian_temporal_memory as btm
 
 class BayesianTMTest(unittest.TestCase):
     def setUp(self):
+        self.column_count = 5
+        self.basal_input_size = 4
+        self.apical_input_size = 6
+        self.cells_per_column = 2
         # Reduce network size
         self.btm = btm.ApicalTiebreakBayesianTemporalMemory(
-            columnCount=5,
-            basalInputSize=4,
-            apicalInputSize=6,
-            cellsPerColumn=2
+            columnCount=self.column_count,
+            basalInputSize=self.basal_input_size,
+            apicalInputSize=self.apical_input_size,
+            cellsPerColumn=self.cells_per_column
         )
 
     def test_reset(self):
@@ -44,6 +48,12 @@ class BayesianTMTest(unittest.TestCase):
         self.assertEqual(self.btm.activeCells.shape, (self.btm.numberOfCells(),),
                          'Dimensionality mismatch of active cells')
         self.assertTrue(np.all(self.btm.basalInput == 0), 'Active cells after reset non-zero')
+
+    def test_depolarize_cells(self):
+        basal_input = np.full(self.basal_input_size, 0.5)
+        apical_input = np.full(self.apical_input_size, 0.2)
+
+        self.btm.depolarizeCells(basal_input, apical_input)
 
 
 if __name__ == '__main__':
