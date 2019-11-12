@@ -296,7 +296,8 @@ class ApicalTiebreakBayesianTemporalMemory(object):
   def _calculatePredictedValues(self, activation_basal, activation_apical):
     predicted_cells = self._calculatePredictedCells(activation_basal, activation_apical)
     normalisation = np.exp(predicted_cells.reshape((self.numberOfColumns(), self.cellsPerColumn))).sum(axis=1)
-    predicted_cells = np.exp(predicted_cells) / normalisation
+    predicted_cells = (np.exp(predicted_cells.reshape((self.numberOfColumns(), self.cellsPerColumn)))
+                       / normalisation.reshape((normalisation.shape[0], 1))).reshape(-1)
     predicted_cells[predicted_cells < self.minThreshold] = 0.0
     return predicted_cells
 
