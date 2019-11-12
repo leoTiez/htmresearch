@@ -127,17 +127,20 @@ class ApicalTiebreakTemporalMemory(object):
     self.apicalInputSize = apicalInputSize
 
     # We use a continuous weight matrix
-    # Three dimensional to have weight from every input to every segment
-    # +1 for bias term
+    # Three dimensional to have weight from every input to every segment with mapping from segment to cell
     self.basalWeigths = np.zeros(
-      (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.basalInputSize + 1))
+      (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.basalInputSize))
     self.apicalWeights = np.zeros(
-      (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.apicalInputSize + 1))
+      (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.apicalInputSize))
+    self.basalBias = np.zeros((self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn))
+    self.apicalBias = np.zeros((self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn))
 
     self.basalMovingAverages = np.zeros(
-      (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.basalInputSize + 1))
+      (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.basalInputSize))
     self.apicalMovingAverages = np.zeros(
-      (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.apicalInputSize + 1))
+      (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.apicalInputSize))
+    self.basalMovingAveragesBias = np.zeros((self.maxSegmentsPerCell, self.columnCount * self.cellsPerColumn))
+    self.apicalMovingAveragesBias = np.zeros((self.maxSegmentsPerCell, self.columnCount * self.cellsPerColumn))
 
     self.noise = noise
     self.learningRate = learning_rate
@@ -198,8 +201,8 @@ class ApicalTiebreakTemporalMemory(object):
     Whether learning is enabled. Some TM implementations may depolarize cells
     differently or do segment activity bookkeeping when learning is enabled.
     """
-    activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.minThreshold)
-    activation_basal = self._calculateSegmentActivity(self.apicalWeights, basalInput, self.minThreshold)
+    activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.apicalBias)
+    activation_basal = self._calculateSegmentActivity(self.apicalWeights, basalInput, self.basalBias)
 
     self.predictedCells = self._calculatePredictedValues(activation_basal, activation_apical)
     self.activeBasalSegments = activation_apical
@@ -265,16 +268,18 @@ class ApicalTiebreakTemporalMemory(object):
 
     # Update moving averages
     # TODO updates moving averages of segments when they have sufficient activiation even if they have not been previously used -> Required?
-    self.basalMovingAverages = self._updateMovingAverage(
+    self.basalMovingAverages, self.basalMovingAveragesBias = self._updateMovingAverage(
       self.activeBasalSegments,
       self.basalMovingAverages,
+      self.basalMovingAveragesBias,
       self.basalInput,
       self.basalInputSize,
       temporalLearningRate
     )
-    self.apicalMovingAverages = self._updateMovingAverage(
+    self.apicalMovingAverages, self.apicalMovingAveragesBias = self._updateMovingAverage(
       self.activeApicalSegments,
       self.apicalMovingAverages,
+      self.apicalMovingAveragesBias,
       self.apicalInput,
       self.apicalInputSize,
       temporalLearningRate
@@ -341,7 +346,15 @@ class ApicalTiebreakTemporalMemory(object):
       self.numberOfCells()
     )
 
-  def _updateMovingAverage(self, segments, movingAverage, inputValues, inputSize, learningRate):
+  def _updateMovingAverage(
+          self,
+          segments,
+          movingAverage,
+          movingAverageBias,
+          inputValues,
+          inputSize,
+          learningRate
+  ):
     if learningRate is None:
       learningRate = self.learningRate
 
@@ -353,15 +366,15 @@ class ApicalTiebreakTemporalMemory(object):
       (1 - self.noise**2) * segments,
       inputValues
     ).reshape(self.maxSegmentsPerCell, self.numberOfCells(), inputSize) + self.noise**2
-    movingAverage[:, :, :-1] += learningRate * (
-            noisy_connection_matrix - movingAverage[:, :, :-1]
+    movingAverage[:, :, :] += learningRate * (
+            noisy_connection_matrix - movingAverage[:, :, :]
     )
 
-    noisy_activation_vector = (1 - self.noise) * segments.reshape(-1) + self.noise
-    movingAverage[:, :, -1].reshape(-1)[:] += learningRate * (
-            noisy_activation_vector - movingAverage[:, :, -1].reshape(-1)
+    noisy_activation_vector = (1 - self.noise) * segments + self.noise
+    movingAverageBias += learningRate * (
+            noisy_activation_vector - movingAverage
     )
-    return movingAverage
+    return movingAverage, movingAverageBias
 
   def _calculateApicalLearning(self,
                                learningCells,
@@ -431,35 +444,9 @@ class ApicalTiebreakTemporalMemory(object):
             newApicalSegmentCells)
 
   @staticmethod
-  def _calculateSegmentActivity(weights, activeInput, minThreshold):
-    """
-    Calculate the active and matching apical segments for this timestep.
+  def _calculateSegmentActivity(weights, activeInput, bias):
 
-
-    Previous return tuple
-    - activeSegments (numpy array)
-      Dendrite segments with enough active connected synapses to cause a
-      dendritic spike
-
-    - matchingSegments (numpy array)
-      Dendrite segments with enough active potential synapses to be selected for
-      learning in a bursting column
-
-    - potentialOverlaps (numpy array)
-      The number of active potential synapses for each segment.
-      Includes counts for active, matching, and nonmatching segments.
-
-    Now, we return instead the values for the depolarised neurons segments only
-
-    :param apicalWeights (numpy array) continuous valued matrix with weights
-    :param activeInput (numpy array) input activity values
-    IMPORTANT: We assume now that active input is a continuous valued numpy array. This means that all segments
-    pass an input.
-    :returns depolarised values of the neurons. Representing activity probabilities
-    """
-
-    # append 1 to input because of bias term
-    activation = np.log(weights.dot(np.append(activeInput, [1])))
+    activation = np.log(weights.dot(np.append(activeInput))) + bias
     return activation
 
   def _calculatePredictedCells(self, activeBasalSegments, activeApicalSegments):
@@ -482,39 +469,8 @@ class ApicalTiebreakTemporalMemory(object):
 
     return max_cells
 
-  def _learn(self, weights, movingAverages):
-    """
-    Adjust synapse permanences, grow new synapses, and grow new segments.
-
-    @param learningActiveSegments (numpy array)
-    @param learningMatchingSegments (numpy array)
-    @param activeInput (numpy array)
-    @param growthCandidates (numpy array)
-    @param potentialOverlaps (numpy array)
-    """
-    # movingAverage[:, :, :-1]
-    # Learn on existing segments
-    connections.adjustSynapses(learningSegments, activeInput,
-                               permanenceIncrement, -permanenceDecrement)
-
-    # Grow new synapses. Calculate "maxNew", the maximum number of synapses to
-    # grow per segment. "maxNew" might be a number or it might be a list of
-    # numbers.
-    if sampleSize == -1:
-      maxNew = len(growthCandidates)
-    else:
-      maxNew = sampleSize - potentialOverlaps[learningSegments]
-
-    if maxSynapsesPerSegment != -1:
-      synapseCounts = connections.mapSegmentsToSynapseCounts(
-        learningSegments)
-      numSynapsesToReachMax = maxSynapsesPerSegment - synapseCounts
-      maxNew = np.where(maxNew <= numSynapsesToReachMax,
-                        maxNew, numSynapsesToReachMax)
-
-    connections.growSynapsesToSample(learningSegments, growthCandidates,
-                                     maxNew, initialPermanence, rng)
-
+  def _learn(self, weights, movingAverage):
+    weights[:, :, :-1] = movingAverage[:, :, :-1] / np.outer(movingAverage[:, :, -1], movingAverage[:, :, -1])
 
   @staticmethod
   def _learnOnNewSegments(connections, rng, newSegmentCells, growthCandidates,
