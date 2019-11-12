@@ -215,7 +215,7 @@ class ApicalTiebreakTemporalMemory(object):
 
   def activateCells(self,
                     activeColumns,
-                    basalReinforceCandidates,
+                    basalReinforceCandidates, # Do not delete since most likely needed for interface communication
                     apicalReinforceCandidates,
                     basalGrowthCandidates,
                     apicalGrowthCandidates,
@@ -291,24 +291,16 @@ class ApicalTiebreakTemporalMemory(object):
 
     # Learn
     if learn:
-      # Learn on existing segments
-      for learningSegments in (learningActiveBasalSegments,
-                               learningMatchingBasalSegments):
-        self._learn(self.basalConnections, self.rng, learningSegments,
-                    basalReinforceCandidates, basalGrowthCandidates,
-                    self.basalPotentialOverlaps,
-                    self.initialPermanence, self.sampleSize,
-                    self.permanenceIncrement, self.permanenceDecrement,
-                    self.maxSynapsesPerSegment)
-
-      for learningSegments in (learningActiveApicalSegments,
-                               learningMatchingApicalSegments):
-
-        self._learn(self.apicalConnections, self.rng, learningSegments,
-                    apicalReinforceCandidates, apicalGrowthCandidates,
-                    self.apicalPotentialOverlaps, self.initialPermanence,
-                    self.sampleSize, self.permanenceIncrement,
-                    self.permanenceDecrement, self.maxSynapsesPerSegment)
+      self.basalWeigths, self.basalBias = self._learn(
+        self.basalMovingAverages,
+        self.basalMovingAveragesBias,
+        self.basalMovingAverageInput
+      )
+      self.apicalWeights, self.apicalBias = self._learn(
+        self.apicalMovingAverages,
+        self.apicalMovingAveragesBias,
+        self.apicalMovingAverageInput
+      )
 
   def _calculatePredictedValues(self, activation_basal, activation_apical):
     predicted_cells = self._calculatePredictedCells(activation_basal, activation_apical)
@@ -480,7 +472,8 @@ class ApicalTiebreakTemporalMemory(object):
 
     return max_cells
 
-  def _learn(self, movingAverages, movingAveragesBias, movingAveragesInput):
+  @staticmethod
+  def _learn(movingAverages, movingAveragesBias, movingAveragesInput):
     weights = movingAverages / np.outer(
       movingAveragesBias,
       movingAveragesInput
