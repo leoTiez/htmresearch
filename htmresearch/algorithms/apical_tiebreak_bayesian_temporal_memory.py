@@ -27,7 +27,7 @@ from htmresearch.support import numpy_helpers as np2
 from nupic.bindings.math import Random, SparseMatrixConnections
 
 
-class ApicalTiebreakTemporalMemory(object):
+class ApicalTiebreakBayesianTemporalMemory(object):
   """
   A generalized Temporal Memory with apical dendrites that add a "tiebreak".
 
