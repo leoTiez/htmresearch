@@ -244,15 +244,17 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     self.activeCells = self.predictedCells.copy()
     self.activeCells.reshape(self.numberOfColumns(), self.cellsPerColumn)[inactive_columns, :] = 0
     # find bursting columns
-    bursting_columns = np.where(
+    bursting_columns = activeColumns[np.where(
       np.abs(self.activeCells.reshape(
         self.numberOfColumns(), self.cellsPerColumn)[activeColumns, :].sum(axis=1)
-             ) < self.minThreshold)
+             ) < self.minThreshold)]
 
+    # if bursting_columns:
     # Calculate basal segment activity after bursting
     self.activeBasalSegments = self._setMaxSegmentsAfterBursting(bursting_columns, self.activeBasalSegments)
     self.activeApicalSegments = self._setMaxSegmentsAfterBursting(bursting_columns, self.activeApicalSegments)
     self.predictedCells = self._calculatePredictedValues(self.activeBasalSegments, self.activeApicalSegments)
+
     # Reset active cells values
     self.activeCells = self.predictedCells.copy()
     self.activeCells.reshape(self.numberOfColumns(), self.cellsPerColumn)[inactive_columns, :] = 0
