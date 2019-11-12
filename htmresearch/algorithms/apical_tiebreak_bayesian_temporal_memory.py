@@ -261,8 +261,19 @@ class ApicalTiebreakTemporalMemory(object):
     self.activeBasalSegments = self._setNonActiveSegments(self.activeBasalSegments, inactive_columns)
     self.activeApicalSegments = self._setNonActiveSegments(self.activeApicalSegments, inactive_columns)
 
-    # Calculate basal learning
-    self._calculateBasalLearning(inactive_columns, bursting_columns)
+    # Update moving averages
+    self.basalMovingAverages = self._updateMovingAverage(
+      self.activeBasalSegments,
+      self.basalMovingAverages,
+      self.basalInput,
+      self.basalInputSize
+    )
+    self.apicalMovingAverages = self._updateMovingAverage(
+      self.activeApicalSegments,
+      self.apicalMovingAverages,
+      self.apicalInput,
+      self.apicalInputSize
+    )
 
     (learningActiveApicalSegments,
      learningMatchingApicalSegments,
@@ -363,57 +374,25 @@ class ApicalTiebreakTemporalMemory(object):
       self.numberOfCells()
     )
 
-  def _calculateBasalLearning(self, inactiveColumns, burstingColumns):
-    """
-    Basic Temporal Memory learning. Correctly predicted cells always have
-    active basal segments, and we learn on these segments. In bursting
-    columns, we either learn on an existing basal segment, or we grow a new one.
-
-    The only influence apical dendrites have on basal learning is: the apical
-    dendrites influence which cells are considered "predicted". So an active
-    apical dendrite can prevent some basal segments in active columns from
-    learning.
-
-    @param correctPredictedCells (numpy array)
-    @param burstingColumns (numpy array)
-    @param activeBasalSegments (numpy array)
-    @param matchingBasalSegments (numpy array)
-    @param basalPotentialOverlaps (numpy array)
-
-    @return (tuple)
-    - learningActiveBasalSegments (numpy array)
-      Active basal segments on correct predicted cells
-
-    - learningMatchingBasalSegments (numpy array)
-      Matching basal segments selected for learning in bursting columns
-
-    - basalSegmentsToPunish (numpy array)
-      Basal segments that should be punished for predicting an inactive column
-
-    - newBasalSegmentCells (numpy array)
-      Cells in bursting columns that were selected to grow new basal segments
-
-    - learningCells (numpy array)
-      Cells that have learning basal segments or are selected to grow a basal
-      segment
-    """
-
+  def _updateMovingAverage(self, segments, movingAverage, input, inputSize):
     # All segments of cells with a predicted value below the threshold are set to 0
-    self.activeBasalSegments[:, self.activeBasalSegments.max(axis=0) < self.minThreshold] = 0.0
+    segments[:, segments.max(axis=0) < self.minThreshold] = 0.0
 
     # Updating of the moving averages
     noisy_connection_matrix = np.outer(
-      (1 - self.noise**2) * self.activeBasalSegments,
-      self.basalInput
-    ).reshape(self.maxSegmentsPerCell, self.numberOfCells(), self.basalInputSize) + self.noise**2
-    self.basalMovingAverages[:, :, :-1] += self.learningRate * (
-            noisy_connection_matrix - self.basalMovingAverages[:, :, :-1]
+      (1 - self.noise**2) * segments,
+      input
+    ).reshape(self.maxSegmentsPerCell, self.numberOfCells(), inputSize) + self.noise**2
+    movingAverage[:, :, :-1] += self.learningRate * (
+            noisy_connection_matrix - movingAverage[:, :, :-1]
     )
 
-    noisy_activation_vector = (1 - self.noise) * self.activeBasalSegments.reshape(-1) + self.noise
-    self.basalMovingAverages[:, :, -1].reshape(-1)[:] += self.learningRate * (
-            noisy_activation_vector - self.basalMovingAverages[:, :, -1].reshape(-1)
+    noisy_activation_vector = (1 - self.noise) * segments.reshape(-1) + self.noise
+    movingAverage[:, :, -1].reshape(-1)[:] += self.learningRate * (
+            noisy_activation_vector - movingAverage[:, :, -1].reshape(-1)
     )
+    return movingAverage
+
   def _calculateApicalLearning(self,
                                learningCells,
                                activeColumns,
