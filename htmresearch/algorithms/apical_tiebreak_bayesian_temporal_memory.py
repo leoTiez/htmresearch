@@ -480,8 +480,15 @@ class ApicalTiebreakTemporalMemory(object):
 
     return max_cells
 
-  def _learn(self, weights, movingAverages, movingAveragesBias):
-    weights[:, :, :-1] = movingAverage[:, :, :-1] / np.outer(movingAverage[:, :, -1], movingAverage[:, :, -1])
+  def _learn(self, movingAverages, movingAveragesBias, movingAveragesInput):
+    weights = movingAverages / np.outer(
+      movingAveragesBias,
+      movingAveragesInput
+    ).reshape(movingAverages.shape)
+
+    bias = np.log(movingAveragesBias)
+
+    return weights, bias
 
   @staticmethod
   def _learnOnNewSegments(connections, rng, newSegmentCells, growthCandidates,
