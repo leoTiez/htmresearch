@@ -215,7 +215,10 @@ class ApicalTiebreakTemporalMemory(object):
                     apicalReinforceCandidates,
                     basalGrowthCandidates,
                     apicalGrowthCandidates,
-                    learn=True):
+                    learn=True,
+                    temporalLearningRate=None # Makes it possible to update moving averages while not learning
+                                              # and to turn off updating moving averages
+                    ):
     """
     Activate cells in the specified columns, using the result of the previous
     'depolarizeCells' as predictions. Then learn.
@@ -266,21 +269,16 @@ class ApicalTiebreakTemporalMemory(object):
       self.activeBasalSegments,
       self.basalMovingAverages,
       self.basalInput,
-      self.basalInputSize
+      self.basalInputSize,
+      temporalLearningRate
     )
     self.apicalMovingAverages = self._updateMovingAverage(
       self.activeApicalSegments,
       self.apicalMovingAverages,
       self.apicalInput,
-      self.apicalInputSize
+      self.apicalInputSize,
+      temporalLearningRate
     )
-
-    (learningActiveApicalSegments,
-     learningMatchingApicalSegments,
-     apicalSegmentsToPunish,
-     newApicalSegmentCells) = self._calculateApicalLearning(
-       learningCells, activeColumns, self.activeApicalSegments,
-       self.matchingApicalSegments, self.apicalPotentialOverlaps)
 
     # Learn
     if learn:
@@ -374,21 +372,24 @@ class ApicalTiebreakTemporalMemory(object):
       self.numberOfCells()
     )
 
-  def _updateMovingAverage(self, segments, movingAverage, input, inputSize):
+  def _updateMovingAverage(self, segments, movingAverage, inputValues, inputSize, learningRate):
+    if learningRate is None:
+      learningRate = self.learningRate
+
     # All segments of cells with a predicted value below the threshold are set to 0
     segments[:, segments.max(axis=0) < self.minThreshold] = 0.0
 
     # Updating of the moving averages
     noisy_connection_matrix = np.outer(
       (1 - self.noise**2) * segments,
-      input
+      inputValues
     ).reshape(self.maxSegmentsPerCell, self.numberOfCells(), inputSize) + self.noise**2
-    movingAverage[:, :, :-1] += self.learningRate * (
+    movingAverage[:, :, :-1] += learningRate * (
             noisy_connection_matrix - movingAverage[:, :, :-1]
     )
 
     noisy_activation_vector = (1 - self.noise) * segments.reshape(-1) + self.noise
-    movingAverage[:, :, -1].reshape(-1)[:] += self.learningRate * (
+    movingAverage[:, :, -1].reshape(-1)[:] += learningRate * (
             noisy_activation_vector - movingAverage[:, :, -1].reshape(-1)
     )
     return movingAverage
