@@ -118,6 +118,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     self.basalWeigths = np.zeros(
       (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.basalInputSize))
     # Initialise weights to first segment randomly
+    # TODO check whether this is necessary. Setting it zero should conceptually work. What is the outcome?
     self.basalWeigths[0, :, :] = np.random.random(self.basalWeigths[0, :, :].shape)
     self.apicalWeights = np.zeros(
       (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.apicalInputSize))
@@ -373,7 +374,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
   @staticmethod
   def _calculateSegmentActivity(weights, activeInput, bias):
-
+    # Runtime warnings for negative infinity can be ignored here
     activation = np.log(weights.dot(activeInput)) + bias
     return activation
 
