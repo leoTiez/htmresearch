@@ -369,7 +369,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
   @staticmethod
   def _calculateSegmentActivity(weights, activeInput, bias):
 
-    activation = np.log(weights.dot(np.append(activeInput))) + bias
+    activation = np.log(weights.dot(activeInput)) + bias
     return activation
 
   def _calculatePredictedCells(self, activeBasalSegments, activeApicalSegments):
