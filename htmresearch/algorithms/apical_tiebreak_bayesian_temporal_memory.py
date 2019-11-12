@@ -141,6 +141,8 @@ class ApicalTiebreakTemporalMemory(object):
       (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.apicalInputSize))
     self.basalMovingAveragesBias = np.zeros((self.maxSegmentsPerCell, self.columnCount * self.cellsPerColumn))
     self.apicalMovingAveragesBias = np.zeros((self.maxSegmentsPerCell, self.columnCount * self.cellsPerColumn))
+    self.basalMovingAverageInput = np.zeros(self.basalInputSize)
+    self.apicalMovingAverageInput = np.zeros(self.apicalInputSize)
 
     self.noise = noise
     self.learningRate = learning_rate
@@ -268,18 +270,20 @@ class ApicalTiebreakTemporalMemory(object):
 
     # Update moving averages
     # TODO updates moving averages of segments when they have sufficient activiation even if they have not been previously used -> Required?
-    self.basalMovingAverages, self.basalMovingAveragesBias = self._updateMovingAverage(
+    self.basalMovingAverages, self.basalMovingAveragesBias, self.basalMovingAverageInput = self._updateMovingAverage(
       self.activeBasalSegments,
       self.basalMovingAverages,
       self.basalMovingAveragesBias,
+      self.basalMovingAverageInput,
       self.basalInput,
       self.basalInputSize,
       temporalLearningRate
     )
-    self.apicalMovingAverages, self.apicalMovingAveragesBias = self._updateMovingAverage(
+    self.apicalMovingAverages, self.apicalMovingAveragesBias, self.apicalMovingAverageInput = self._updateMovingAverage(
       self.activeApicalSegments,
       self.apicalMovingAverages,
       self.apicalMovingAveragesBias,
+      self.apicalMovingAverageInput,
       self.apicalInput,
       self.apicalInputSize,
       temporalLearningRate
@@ -351,6 +355,7 @@ class ApicalTiebreakTemporalMemory(object):
           segments,
           movingAverage,
           movingAverageBias,
+          movingAverageInput,
           inputValues,
           inputSize,
           learningRate
@@ -361,20 +366,26 @@ class ApicalTiebreakTemporalMemory(object):
     # All segments of cells with a predicted value below the threshold are set to 0
     segments[:, segments.max(axis=0) < self.minThreshold] = 0.0
 
-    # Updating of the moving averages
+    # Updating moving average weights to input
     noisy_connection_matrix = np.outer(
       (1 - self.noise**2) * segments,
       inputValues
     ).reshape(self.maxSegmentsPerCell, self.numberOfCells(), inputSize) + self.noise**2
-    movingAverage[:, :, :] += learningRate * (
-            noisy_connection_matrix - movingAverage[:, :, :]
+    movingAverage += learningRate * (
+            noisy_connection_matrix - movingAverage
     )
 
+    # Updating moving average bias of each segment
     noisy_activation_vector = (1 - self.noise) * segments + self.noise
     movingAverageBias += learningRate * (
-            noisy_activation_vector - movingAverage
+            noisy_activation_vector - movingAverageBias
     )
-    return movingAverage, movingAverageBias
+    # Updating moving average input activity
+    noisy_input_vector = (1 - self.noise) * inputValues + self.noise
+    movingAverageInput += learningRate * (
+            noisy_input_vector - movingAverageInput
+    )
+    return movingAverage, movingAverageBias, movingAverageInput
 
   def _calculateApicalLearning(self,
                                learningCells,
@@ -469,7 +480,7 @@ class ApicalTiebreakTemporalMemory(object):
 
     return max_cells
 
-  def _learn(self, weights, movingAverage):
+  def _learn(self, weights, movingAverages, movingAveragesBias):
     weights[:, :, :-1] = movingAverage[:, :, :-1] / np.outer(movingAverage[:, :, -1], movingAverage[:, :, -1])
 
   @staticmethod
