@@ -207,10 +207,10 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
   def activateCells(self,
                     activeColumns,
-                    basalReinforceCandidates, # Do not delete since most likely needed for interface communication
-                    apicalReinforceCandidates,
-                    basalGrowthCandidates,
-                    apicalGrowthCandidates,
+                    basalReinforceCandidates=None, # Do not delete since most likely needed for interface communication
+                    apicalReinforceCandidates=None,
+                    basalGrowthCandidates=None,
+                    apicalGrowthCandidates=None,
                     learn=True,
                     temporalLearningRate=None # Makes it possible to update moving averages while not learning
                                               # and to turn off updating moving averages
