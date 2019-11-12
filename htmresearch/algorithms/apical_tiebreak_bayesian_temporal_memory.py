@@ -191,7 +191,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     differently or do segment activity bookkeeping when learning is enabled.
     """
     activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.apicalBias)
-    activation_basal = self._calculateSegmentActivity(self.apicalWeights, basalInput, self.basalBias)
+    activation_basal = self._calculateSegmentActivity(self.basalWeigths, basalInput, self.basalBias)
 
     self.predictedCells = self._calculatePredictedValues(activation_basal, activation_apical)
     self.activeBasalSegments = activation_apical
