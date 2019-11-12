@@ -17,6 +17,8 @@ class BayesianTMTest(unittest.TestCase):
         self.apical_input_size = 6
         self.cells_per_column = 2
         self.min_threshold = 0.3
+        self.basal_input_value = 0.5
+        self.apical_input_value = 0.2
         # Reduce network size
         self.btm = btm.ApicalTiebreakBayesianTemporalMemory(
             columnCount=self.column_count,
@@ -54,8 +56,8 @@ class BayesianTMTest(unittest.TestCase):
         self.assertTrue(np.all(self.btm.basalInput == 0), 'Active cells after reset non-zero')
 
     def test_depolarize_cells(self):
-        basal_input = np.full(self.basal_input_size, 0.5)
-        apical_input = np.full(self.apical_input_size, 0.2)
+        basal_input = np.full(self.basal_input_size, self.basal_input_value)
+        apical_input = np.full(self.apical_input_size, self.apical_input_value)
 
         self.btm.depolarizeCells(basal_input, apical_input)
 
@@ -69,6 +71,8 @@ class BayesianTMTest(unittest.TestCase):
         )
         active_cells[:, inactive_columns] = 0.0
 
+        self.btm.basalInput = np.full(self.basal_input_size, self.basal_input_value)
+        self.btm.apicalInput = np.full(self.apical_input_size, self.apical_input_value)
         self.btm.activateCells(active_columns)
 
         self.assertTrue(
@@ -92,18 +96,46 @@ class BayesianTMTest(unittest.TestCase):
             self.column_count
         )[:, active_columns].argmax(axis=1)
 
-        self._movingAverageWeightsTests(self.btm.basalMovingAverages, active_columns, active_cells)
+        # Moving average weight
+        self._movingAverageWeightsTests(
+            self.btm.basalMovingAverages,
+            active_columns,
+            active_cells,
+            self.basal_input_size
+        )
+        self._movingAverageWeightsTests(
+            self.btm.apicalMovingAverages,
+            active_columns,
+            active_cells,
+            self.apical_input_size
+        )
 
-    def _movingAverageWeightsTests(self, moving_average, active_columns, active_cells):
+        # Moving average bias
+        self._movingAverageBiasTests(
+            self.btm.basalMovingAveragesBias,
+            active_columns,
+            active_cells
+        )
+        self._movingAverageBiasTests(
+            self.btm.apicalMovingAveragesBias,
+            active_columns,
+            active_cells
+        )
+
+        # Moving average input
+        self._movingAverageInputTests(self.btm.basalMovingAverageInput, self.basal_input_value)
+        self._movingAverageInputTests(self.btm.apicalMovingAverageInput, self.apical_input_value)
+
+    def _movingAverageWeightsTests(self, moving_average, active_columns, active_cells, input_size):
         self.assertTrue(
             np.all(
                 moving_average.reshape((
                     self.max_segments_per_cell,
                     self.cells_per_column,
                     self.column_count,
-                    self.basal_input_size
+                    input_size
                 ))[0, :, active_columns, :][active_cells, :, :] > 0.0
-            )
+            ), 'Not all weights to active segments have been updated'
         )
 
         self.assertTrue(
@@ -112,10 +144,40 @@ class BayesianTMTest(unittest.TestCase):
                     self.max_segments_per_cell,
                     self.cells_per_column,
                     self.column_count,
-                    self.basal_input_size
+                    input_size
                 ))[1:, :, :, :] == 0.0
-            )
+            ), 'Weights to inactive segments have been updated'
         )
+
+    def _movingAverageBiasTests(self, moving_average_bias, active_columns, active_cells):
+        self.assertTrue(
+            np.all(
+                moving_average_bias.reshape((
+                    self.max_segments_per_cell,
+                    self.cells_per_column,
+                    self.column_count
+                ))[0, :, active_columns][active_cells, :] > 0.0
+            ), 'Not all biases to active segments have been updated'
+        )
+
+        self.assertTrue(
+            np.all(
+                moving_average_bias.reshape((
+                    self.max_segments_per_cell,
+                    self.cells_per_column,
+                    self.column_count
+                ))[1:, :, :] == 0.0
+            ), 'Biases to inactive segments have been updated'
+        )
+
+    def _movingAverageInputTests(self, moving_average_input, input_value):
+        moving_average_value = self.btm.learningRate * ((1 - self.btm.noise) * input_value + self.btm.noise)
+        self.assertTrue(
+            np.all(
+                moving_average_input == moving_average_value
+            ), 'Not all input moving averages have same value while having same input'
+        )
+
 
 if __name__ == '__main__':
     unittest.main()
