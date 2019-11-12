@@ -117,8 +117,12 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     # Three dimensional to have weight from every input to every segment with mapping from segment to cell
     self.basalWeigths = np.zeros(
       (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.basalInputSize))
+    # Initialise weights to first segment randomly
+    self.basalWeigths[0, :, :] = np.random.random(self.basalWeigths[0, :, :].shape)
     self.apicalWeights = np.zeros(
       (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.apicalInputSize))
+    # Initialise weights to first segment randomly
+    self.apicalWeights[0, :, :] = np.random.random(self.apicalWeights[0, :, :].shape)
     self.basalBias = np.zeros((self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn))
     self.apicalBias = np.zeros((self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn))
 
