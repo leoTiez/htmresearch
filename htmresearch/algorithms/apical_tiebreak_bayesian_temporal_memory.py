@@ -249,11 +249,11 @@ class ApicalTiebreakBayesianTemporalMemory(object):
         self.numberOfColumns(), self.cellsPerColumn)[activeColumns, :].sum(axis=1)
              ) < self.minThreshold)]
 
-    # if bursting_columns:
+    if bursting_columns.shape[0] > 0:
     # Calculate basal segment activity after bursting
-    self.activeBasalSegments = self._setMaxSegmentsAfterBursting(bursting_columns, self.activeBasalSegments)
-    self.activeApicalSegments = self._setMaxSegmentsAfterBursting(bursting_columns, self.activeApicalSegments)
-    self.predictedCells = self._calculatePredictedValues(self.activeBasalSegments, self.activeApicalSegments)
+      self.activeBasalSegments = self._setMaxSegmentsAfterBursting(bursting_columns, self.activeBasalSegments)
+      self.activeApicalSegments = self._setMaxSegmentsAfterBursting(bursting_columns, self.activeApicalSegments)
+      self.predictedCells = self._calculatePredictedValues(self.activeBasalSegments, self.activeApicalSegments)
 
     # Reset active cells values
     self.activeCells = self.predictedCells.copy()
@@ -308,15 +308,14 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     # Calculate bursting columns
     # This makes sure that only segments are learnt that are active
     # Reshaping active segments for easy access per column
-    segments = self._reshapeSegmentsToColumnBased(segments)
+    segments_column_based = self._reshapeSegmentsToColumnBased(segments)
+    segments_bursting_columns = self._reshapeSegmetsFromColumnBased(
+      segments_column_based[:, :, burstingColumns],
+      numOfColumns=burstingColumns.shape[0]
+    )
     # Setting the segment with the maximum value to the min threshold
-    segments[
-      np.where(segments[:, :, burstingColumns]
-               == segments[:, :, burstingColumns].max(axis=0))
-    ] = self.minThreshold
-
-    # Reshaping active basal segments to its original shape
-    return self._reshapeSegmetsFromColumnBased(segments)
+    segments[segments_bursting_columns.argmax(axis=1)] = self.minThreshold
+    return segments
 
   def _setNonActiveSegments(self, segments, inactiveColumns):
     segments[segments < self.minThreshold] = 0.0
@@ -324,17 +323,23 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     segments[:, :, inactiveColumns] = 0.0
     return self._reshapeSegmetsFromColumnBased(segments)
 
-  def _reshapeSegmentsToColumnBased(self, segments):
+  def _reshapeSegmentsToColumnBased(self, segments, numOfColumns=None):
+    if numOfColumns is None:
+      numOfColumns = self.numberOfColumns()
+
     return segments.reshape(
       self.maxSegmentsPerCell,
       self.cellsPerColumn,
-      self.numberOfColumns()
+      numOfColumns
     )
 
-  def _reshapeSegmetsFromColumnBased(self, segments):
+  def _reshapeSegmetsFromColumnBased(self, segments, numOfColumns=None):
+    if numOfColumns is None:
+      numOfColumns = self.numberOfColumns()
+
     return segments.reshape(
       self.maxSegmentsPerCell,
-      self.numberOfCells()
+      self.cellsPerColumn*numOfColumns
     )
 
   def _updateMovingAverage(
