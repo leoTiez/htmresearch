@@ -201,8 +201,7 @@ class ApicalTiebreakTemporalMemory(object):
     activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.minThreshold)
     activation_basal = self._calculateSegmentActivity(self.apicalWeights, basalInput, self.minThreshold)
 
-    self.predictedCells = self._calculatePredictedCells(activation_basal, activation_apical)
-    # TODO necessary to use prediction threshold for apical and basal segment values?
+    self.predictedCells = self._calculatePredictedValues(activation_basal, activation_apical)
     self.activeBasalSegments = activation_apical
     self.activeApicalSegments = activation_basal
     # Save basal and apical input values for learning
@@ -256,7 +255,7 @@ class ApicalTiebreakTemporalMemory(object):
     # Calculate basal segment activity after bursting
     self.activeBasalSegments = self._setMaxSegmentsAfterBursting(bursting_columns, self.activeBasalSegments)
     self.activeApicalSegments = self._setMaxSegmentsAfterBursting(bursting_columns, self.activeApicalSegments)
-    self.predictedCells = self._calculatePredictedCells(self.activeBasalSegments, self.activeApicalSegments)
+    self.predictedCells = self._calculatePredictedValues(self.activeBasalSegments, self.activeApicalSegments)
     # Reset active cells values
     self.activeCells = self.predictedCells.copy()
     self.activeCells.reshape(self.numberOfColumns(), self.cellsPerColumn)[inactive_columns, :] = 0
@@ -265,6 +264,7 @@ class ApicalTiebreakTemporalMemory(object):
     self.activeApicalSegments = self._setNonActiveSegments(self.activeApicalSegments, inactive_columns)
 
     # Update moving averages
+    # TODO updates moving averages of segments when they have sufficient activiation even if they have not been previously used -> Required?
     self.basalMovingAverages = self._updateMovingAverage(
       self.activeBasalSegments,
       self.basalMovingAverages,
@@ -301,38 +301,7 @@ class ApicalTiebreakTemporalMemory(object):
                     self.sampleSize, self.permanenceIncrement,
                     self.permanenceDecrement, self.maxSynapsesPerSegment)
 
-      # Punish incorrect predictions
-      if self.basalPredictedSegmentDecrement != 0.0:
-        self.basalConnections.adjustActiveSynapses(
-          basalSegmentsToPunish, basalReinforceCandidates,
-          -self.basalPredictedSegmentDecrement)
-
-      if self.apicalPredictedSegmentDecrement != 0.0:
-        self.apicalConnections.adjustActiveSynapses(
-          apicalSegmentsToPunish, apicalReinforceCandidates,
-          -self.apicalPredictedSegmentDecrement)
-
-      # Grow new segments
-      if len(basalGrowthCandidates) > 0:
-        self._learnOnNewSegments(self.basalConnections, self.rng,
-                                 newBasalSegmentCells, basalGrowthCandidates,
-                                 self.initialPermanence, self.sampleSize,
-                                 self.maxSynapsesPerSegment)
-
-      if len(apicalGrowthCandidates) > 0:
-        self._learnOnNewSegments(self.apicalConnections, self.rng,
-                                 newApicalSegmentCells, apicalGrowthCandidates,
-                                 self.initialPermanence, self.sampleSize,
-                                 self.maxSynapsesPerSegment)
-
-    # Save the results
-    newActiveCells.sort()
-    learningCells.sort()
-    self.activeCells = newActiveCells
-    self.winnerCells = learningCells
-    self.predictedActiveCells = correctPredictedCells
-
-  def _calculatePredictedCells(self, activation_basal, activation_apical):
+  def _calculatePredictedValues(self, activation_basal, activation_apical):
     predicted_cells = self._calculatePredictedCells(activation_basal, activation_apical)
     normalisation = np.exp(predicted_cells.reshape((self.numberOfColumns(), self.cellsPerColumn))).sum(axis=1)
     predicted_cells = np.exp(predicted_cells) / normalisation
@@ -511,17 +480,9 @@ class ApicalTiebreakTemporalMemory(object):
     max_cells = activeBasalSegments.max(axis=0)
     max_cells += activeApicalSegments.max(axis=0)
 
-    # TODO what does this line do?
-    # if self.useApicalTiebreak == False:
-    #     predictedCells = cellsForBasalSegments
-
     return max_cells
 
-
-  @staticmethod
-  def _learn(connections, rng, learningSegments, activeInput, growthCandidates,
-             potentialOverlaps, initialPermanence, sampleSize,
-             permanenceIncrement, permanenceDecrement, maxSynapsesPerSegment):
+  def _learn(self, weights, movingAverages):
     """
     Adjust synapse permanences, grow new synapses, and grow new segments.
 
@@ -531,7 +492,7 @@ class ApicalTiebreakTemporalMemory(object):
     @param growthCandidates (numpy array)
     @param potentialOverlaps (numpy array)
     """
-
+    # movingAverage[:, :, :-1]
     # Learn on existing segments
     connections.adjustSynapses(learningSegments, activeInput,
                                permanenceIncrement, -permanenceDecrement)
