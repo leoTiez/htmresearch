@@ -136,12 +136,12 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
     self.rng = Random(seed)
     # Changed already to float64
-    self.predictedCells = np.empty(0, dtype="float64")
-    self.activeBasalSegments = np.empty(0, dtype="float64")
-    self.activeApicalSegments = np.empty(0, dtype="float64")
-    self.apicalInput = np.empty(0, dtype="float64")
-    self.basalInput = np.empty(0, dtype="float64")
-    self.activeCells = np.empty(0, dtype="float64")
+    self.predictedCells = np.zeros(self.numberOfCells(), dtype="float64")
+    self.activeBasalSegments = np.zeros((self.maxSegmentsPerCell, self.numberOfCells()), dtype="float64")
+    self.activeApicalSegments = np.zeros((self.maxSegmentsPerCell, self.numberOfCells()), dtype="float64")
+    self.apicalInput = np.zeros(self.apicalInputSize, dtype="float64")
+    self.basalInput = np.zeros(self.basalInputSize, dtype="float64")
+    self.activeCells = np.zeros(self.numberOfCells(), dtype="float64")
     # Still needs to be changed. However, not clear whether they are necessary
     self.winnerCells = np.empty(0, dtype="uint32")
     self.predictedActiveCells = np.empty(0, dtype="uint32")
@@ -159,12 +159,12 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     Clear all cell and segment activity.
     """
     # Changed already to float64
-    self.predictedCells = np.empty(0, dtype="float64")
-    self.activeBasalSegments = np.empty(0, dtype="float64")
-    self.activeApicalSegments = np.empty(0, dtype="float64")
-    self.apicalInput = np.empty(0, dtype="float64")
-    self.basalInput = np.empty(0, dtype="float64")
-    self.activeCells = np.empty(0, dtype="float64")
+    self.predictedCells = np.zeros(self.numberOfCells(), dtype="float64")
+    self.activeBasalSegments = np.zeros((self.maxSegmentsPerCell, self.numberOfCells()), dtype="float64")
+    self.activeApicalSegments = np.zeros((self.maxSegmentsPerCell, self.numberOfCells()), dtype="float64")
+    self.apicalInput = np.zeros(self.apicalInputSize, dtype="float64")
+    self.basalInput = np.zeros(self.basalInputSize, dtype="float64")
+    self.activeCells = np.zeros(self.numberOfCells(), dtype="float64")
     # Still needs to be changed. However, not clear whether they are necessary
     self.winnerCells = np.empty(0, dtype="uint32")
     self.predictedActiveCells = np.empty(0, dtype="uint32")
