@@ -56,21 +56,13 @@ class ApicalTiebreakBayesianTemporalMemory(object):
                basalInputSize=0,
                apicalInputSize=0,
                cellsPerColumn=32,
-               # TODO unnecessary?
-               reducedBasalThreshold=13,
                initialPermanence=0.21,
                # Changed to float
                minThreshold=0.5,
                sampleSize=20,
                noise=0.01,
                learning_rate=0.1,
-               # TODO unnecessary?
-               basalPredictedSegmentDecrement=0.0,
-               # TODO unnecessary?
-               apicalPredictedSegmentDecrement=0.0,
                maxSegmentsPerCell=255,
-               # TODO check negative one?
-               maxSynapsesPerSegment=-1,
                seed=42):
     """
     @param columnCount (int)
@@ -116,12 +108,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     self.columnCount = columnCount
     self.cellsPerColumn = cellsPerColumn
     self.initialPermanence = initialPermanence
-    self.reducedBasalThreshold = reducedBasalThreshold
     self.minThreshold = minThreshold
-    self.sampleSize = sampleSize
-    self.basalPredictedSegmentDecrement = basalPredictedSegmentDecrement
-    self.apicalPredictedSegmentDecrement = apicalPredictedSegmentDecrement
-    self.maxSynapsesPerSegment = maxSynapsesPerSegment
     self.maxSegmentsPerCell = maxSegmentsPerCell
     self.basalInputSize = basalInputSize
     self.apicalInputSize = apicalInputSize
