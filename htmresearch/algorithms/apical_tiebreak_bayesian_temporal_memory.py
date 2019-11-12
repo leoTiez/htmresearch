@@ -149,8 +149,8 @@ class ApicalTiebreakTemporalMemory(object):
     self.activeApicalSegments = np.empty(0, dtype="float64")
     self.apicalInput = np.empty(0, dtype="float64")
     self.basalInput = np.empty(0, dtype="float64")
+    self.activeCells = np.empty(0, dtype="float64")
     # Still needs to be changed. However, not clear whether they are necessary
-    self.activeCells = np.empty(0, dtype="uint32")
     self.winnerCells = np.empty(0, dtype="uint32")
     self.predictedActiveCells = np.empty(0, dtype="uint32")
     self.matchingBasalSegments = np.empty(0, dtype="uint32")
@@ -172,8 +172,8 @@ class ApicalTiebreakTemporalMemory(object):
     self.activeApicalSegments = np.empty(0, dtype="float64")
     self.apicalInput = np.empty(0, dtype="float64")
     self.basalInput = np.empty(0, dtype="float64")
+    self.activeCells = np.empty(0, dtype="float64")
     # Still needs to be changed. However, not clear whether they are necessary
-    self.activeCells = np.empty(0, dtype="uint32")
     self.winnerCells = np.empty(0, dtype="uint32")
     self.predictedActiveCells = np.empty(0, dtype="uint32")
     self.matchingBasalSegments = np.empty(0, dtype="uint32")
@@ -201,12 +201,7 @@ class ApicalTiebreakTemporalMemory(object):
     activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.minThreshold)
     activation_basal = self._calculateSegmentActivity(self.apicalWeights, basalInput, self.minThreshold)
 
-    predicted_cells = self._calculatePredictedCells(activation_basal, activation_apical)
-    normalisation = np.exp(predicted_cells.reshape((self.numberOfColumns(), self.cellsPerColumn))).sum(axis=1)
-    predicted_cells = np.exp(predicted_cells) / normalisation
-    predicted_cells[predicted_cells < self.minThreshold] = 0.0
-
-    self.predictedCells = predicted_cells
+    self.predictedCells = self._calculatePredictedCells(activation_basal, activation_apical)
     # TODO necessary to use prediction threshold for apical and basal segment values?
     self.activeBasalSegments = activation_apical
     self.activeApicalSegments = activation_basal
@@ -246,22 +241,28 @@ class ApicalTiebreakTemporalMemory(object):
     # List of active columns is expected to be an array with indices
     all_columns = np.arange(0, self.numberOfColumns())
     # Get all inactive columns and set their respective predicted cells to zero
-    inactive_columns_mask = np.setdiff1d(all_columns, activeColumns)
-    correct_predicted_cells = self.predictedCells.copy()
-    correct_predicted_cells.reshape(self.numberOfColumns(), self.cellsPerColumn)[inactive_columns_mask, :] = 0
+    inactive_columns = np.setdiff1d(all_columns, activeColumns)
+    self.activeCells = self.predictedCells.copy()
+    self.activeCells.reshape(self.numberOfColumns(), self.cellsPerColumn)[inactive_columns, :] = 0
     # find bursting columns
     bursting_columns = np.where(
-      np.abs(correct_predicted_cells.reshape(
+      np.abs(self.activeCells.reshape(
         self.numberOfColumns(), self.cellsPerColumn)[activeColumns, :].sum(axis=1)
              ) < self.minThreshold)
 
-    # TODO move line to apical learning
-    correct_predicted_cells_mask = correct_predicted_cells[correct_predicted_cells > 0]
-    self.activeApicalSegments[:, ~correct_predicted_cells_mask] = 0
+    # Calculate basal segment activity after bursting
+    self.activeBasalSegments = self._setMaxSegmentsAfterBursting(bursting_columns, self.activeBasalSegments)
+    self.activeApicalSegments = self._setMaxSegmentsAfterBursting(bursting_columns, self.activeApicalSegments)
+    self.predictedCells = self._calculatePredictedCells(self.activeBasalSegments, self.activeApicalSegments)
+    # Reset active cells values
+    self.activeCells = self.predictedCells.copy()
+    self.activeCells.reshape(self.numberOfColumns(), self.cellsPerColumn)[inactive_columns, :] = 0
+    # All non-active segments should be set to zero
+    self.activeBasalSegments = self._setNonActiveSegments(self.activeBasalSegments, inactive_columns)
+    self.activeApicalSegments = self._setNonActiveSegments(self.activeApicalSegments, inactive_columns)
 
-    # Calculate learning
-    # TODO implement update of predicted cells for next calculation step
-    self._calculateBasalLearning(activeColumns, bursting_columns, correct_predicted_cells_mask)
+    # Calculate basal learning
+    self._calculateBasalLearning(inactive_columns, bursting_columns)
 
     (learningActiveApicalSegments,
      learningMatchingApicalSegments,
@@ -322,12 +323,47 @@ class ApicalTiebreakTemporalMemory(object):
     self.winnerCells = learningCells
     self.predictedActiveCells = correctPredictedCells
 
+  def _calculatePredictedCells(self, activation_basal, activation_apical):
+    predicted_cells = self._calculatePredictedCells(activation_basal, activation_apical)
+    normalisation = np.exp(predicted_cells.reshape((self.numberOfColumns(), self.cellsPerColumn))).sum(axis=1)
+    predicted_cells = np.exp(predicted_cells) / normalisation
+    predicted_cells[predicted_cells < self.minThreshold] = 0.0
+    return predicted_cells
 
-  def _calculateBasalLearning(self,
-                              activeColumns,
-                              burstingColumns,
-                              correctPredictedCellsMask
-                              ):
+  def _setMaxSegmentsAfterBursting(self, burstingColumns, segments):
+    # Calculate bursting columns
+    # This makes sure that only segments are learnt that are active
+    # Reshaping active segments for easy access per column
+    segments = self._reshapeSegmentsToColumnBased(segments)
+    # Setting the segment with the maximum value to the min threshold
+    segments[
+      np.where(segments[:, :, burstingColumns]
+               == segments[:, :, burstingColumns].max(axis=0))
+    ] = self.minThreshold
+
+    # Reshaping active basal segments to its original shape
+    return self._reshapeSegmetsFromColumnBased(segments)
+
+  def _setNonActiveSegments(self, segments, inactiveColumns):
+    segments[segments < self.minThreshold] = 0.0
+    segments = self._reshapeSegmentsToColumnBased(segments)
+    segments[:, :, inactiveColumns] = 0.0
+    return self._reshapeSegmetsFromColumnBased(segments)
+
+  def _reshapeSegmentsToColumnBased(self, segments):
+    return segments.reshape(
+      self.maxSegmentsPerCell,
+      self.cellsPerColumn,
+      self.numberOfColumns()
+    )
+
+  def _reshapeSegmetsFromColumnBased(self, segments):
+    return segments.reshape(
+      self.maxSegmentsPerCell,
+      self.numberOfCells()
+    )
+
+  def _calculateBasalLearning(self, inactiveColumns, burstingColumns):
     """
     Basic Temporal Memory learning. Correctly predicted cells always have
     active basal segments, and we learn on these segments. In bursting
@@ -361,24 +397,6 @@ class ApicalTiebreakTemporalMemory(object):
       Cells that have learning basal segments or are selected to grow a basal
       segment
     """
-    # Calculate bursting columns
-    # This makes sure that only segments are learnt that are active
-    # Reshaping active segments for easy access per column
-    self.activeBasalSegments = self.activeBasalSegments.reshape(
-      self.maxSegmentsPerCell,
-      self.cellsPerColumn,
-      self.numberOfColumns()
-    )
-    # Setting the segment with the maximum value to the min threshold
-    self.activeBasalSegments[
-      np.where(self.activeBasalSegments[:, :, burstingColumns]
-               == self.activeBasalSegments[:, :, burstingColumns].max(axis=0))
-    ] = self.minThreshold
-    # Reshaping active basal segments to its original shape
-    self.activeBasalSegments = self.activeBasalSegments.reshape(
-      self.maxSegmentsPerCell,
-      self.numberOfCells()
-    )
 
     # All segments of cells with a predicted value below the threshold are set to 0
     self.activeBasalSegments[:, self.activeBasalSegments.max(axis=0) < self.minThreshold] = 0.0
@@ -396,7 +414,6 @@ class ApicalTiebreakTemporalMemory(object):
     self.basalMovingAverages[:, :, -1].reshape(-1)[:] += self.learningRate * (
             noisy_activation_vector - self.basalMovingAverages[:, :, -1].reshape(-1)
     )
-
   def _calculateApicalLearning(self,
                                learningCells,
                                activeColumns,
