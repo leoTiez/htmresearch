@@ -126,6 +126,16 @@ class BayesianTMTest(unittest.TestCase):
         self._movingAverageInputTests(self.btm.basalMovingAverageInput, self.basal_input_value)
         self._movingAverageInputTests(self.btm.apicalMovingAverageInput, self.apical_input_value)
 
+        # Weights
+        self._movingAverageWeightsTests(self.btm.basalWeights, active_columns, active_cells, self.basal_input_size)
+        self._movingAverageWeightsTests(self.btm.apicalWeights, active_columns, active_cells, self.apical_input_size)
+
+        # Bias
+        self.assertTrue(np.all(self.btm.basalBias == np.log(self.btm.basalMovingAveragesBias)),
+                        'Basal bias does not match the logarithm of the moving average of the bias')
+        self.assertTrue(np.all(self.btm.apicalBias == np.log(self.btm.apicalMovingAveragesBias)),
+                        'Apical bias does not match the logarithm of the moving average of the bias')
+
     def _movingAverageWeightsTests(self, moving_average, active_columns, active_cells, input_size):
         self.assertTrue(
             np.all(
