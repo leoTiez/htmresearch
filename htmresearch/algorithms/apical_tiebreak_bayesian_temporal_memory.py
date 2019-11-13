@@ -115,11 +115,11 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
     # We use a continuous weight matrix
     # Three dimensional to have weight from every input to every segment with mapping from segment to cell
-    self.basalWeigths = np.zeros(
+    self.basalWeights = np.zeros(
       (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.basalInputSize))
     # Initialise weights to first segment randomly
     # TODO check whether this is necessary. Setting it zero should conceptually work. What is the outcome?
-    self.basalWeigths[0, :, :] = np.random.random(self.basalWeigths[0, :, :].shape)
+    self.basalWeights[0, :, :] = np.random.random(self.basalWeights[0, :, :].shape)
     self.apicalWeights = np.zeros(
       (self.maxSegmentsPerCell, self.columnCount*self.cellsPerColumn, self.apicalInputSize))
     # Initialise weights to first segment randomly
@@ -196,7 +196,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     differently or do segment activity bookkeeping when learning is enabled.
     """
     activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.apicalBias)
-    activation_basal = self._calculateSegmentActivity(self.basalWeigths, basalInput, self.basalBias)
+    activation_basal = self._calculateSegmentActivity(self.basalWeights, basalInput, self.basalBias)
 
     self.predictedCells = self._calculatePredictedValues(activation_basal, activation_apical)
     self.activeBasalSegments = activation_apical
@@ -286,7 +286,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
     # Learn
     if learn:
-      self.basalWeigths, self.basalBias = self._learn(
+      self.basalWeights, self.basalBias = self._learn(
         self.basalMovingAverages,
         self.basalMovingAveragesBias,
         self.basalMovingAverageInput
