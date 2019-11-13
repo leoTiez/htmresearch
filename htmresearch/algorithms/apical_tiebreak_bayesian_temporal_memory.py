@@ -428,9 +428,12 @@ class ApicalTiebreakBayesianTemporalMemory(object):
       movingAveragesBias,
       movingAveragesInput
     ).reshape(movingAverages.shape)
+    # set division by zero to zero since this represents unused segments
+    weights[np.isnan(weights)] = 0
 
+    # Unused segments are set to -inf. That is desired since we take the exp function for the activation
+    # exp(-inf) = 0 what is the desired outcome
     bias = np.log(movingAveragesBias)
-
     return weights, bias
 
   @classmethod
