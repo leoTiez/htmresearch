@@ -53,15 +53,15 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
   def __init__(self,
                columnCount=2048,
-               basalInputSize=0,
-               apicalInputSize=0,
+               basalInputSize=0,  # Must be non-equal zero
+               apicalInputSize=0,  # Must be non-equal zero
                cellsPerColumn=32,
                initialPermanence=0.21,
                # Changed to float
                minThreshold=0.5,
                sampleSize=20,
-               noise=0.01,
-               learning_rate=0.1,
+               noise=0.01,  # lambda
+               learning_rate=0.1,  # alpha
                maxSegmentsPerCell=255,
                seed=42):
     """
@@ -147,6 +147,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     self.apicalInput = np.zeros(self.apicalInputSize, dtype="float64")
     self.basalInput = np.zeros(self.basalInputSize, dtype="float64")
     self.activeCells = np.zeros(self.numberOfCells(), dtype="float64")
+    # TODO check where they are needed outside the module and eventually remove and change getter + setter
     # Still needs to be changed. However, not clear whether they are necessary
     self.winnerCells = np.empty(0, dtype="uint32")
     self.predictedActiveCells = np.empty(0, dtype="uint32")
@@ -195,12 +196,12 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     Whether learning is enabled. Some TM implementations may depolarize cells
     differently or do segment activity bookkeeping when learning is enabled.
     """
-    activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.apicalBias)
     activation_basal = self._calculateSegmentActivity(self.basalWeights, basalInput, self.basalBias)
+    activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.apicalBias)
 
     self.predictedCells = self._calculatePredictedValues(activation_basal, activation_apical)
-    self.activeBasalSegments = activation_apical
-    self.activeApicalSegments = activation_basal
+    self.activeBasalSegments = activation_basal
+    self.activeApicalSegments = activation_apical
     # Save basal and apical input values for learning
     self.basalInput = basalInput
     self.apicalInput = apicalInput
