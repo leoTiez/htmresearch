@@ -196,8 +196,8 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     Whether learning is enabled. Some TM implementations may depolarize cells
     differently or do segment activity bookkeeping when learning is enabled.
     """
-    activation_basal = self._calculateSegmentActivity(self.basalWeights, basalInput, self.basalBias)
-    activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.apicalBias)
+    activation_basal = self._calculateSegmentActivity(self.basalWeights, basalInput, self.basalBias, use_bias=True)
+    activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.apicalBias, use_bias=False)
 
     self.predictedCells = self._calculatePredictedValues(activation_basal, activation_apical)
     self.activeBasalSegments = activation_basal
@@ -398,10 +398,10 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     return movingAverage, movingAverageBias, movingAverageInput
 
   @staticmethod
-  def _calculateSegmentActivity(weights, activeInput, bias):
+  def _calculateSegmentActivity(weights, activeInput, bias, use_bias=True):
     # Runtime warnings for negative infinity can be ignored here
-    activation = np.log(weights.dot(activeInput)) + bias
-    return activation
+    activation = np.log(weights.dot(activeInput))
+    return activation if not use_bias else activation + bias
 
   def _calculatePredictedCells(self, activeBasalSegments, activeApicalSegments):
     """
@@ -418,8 +418,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
     @return (numpy array)
     """
-    max_cells = activeBasalSegments.max(axis=0)
-    max_cells += activeApicalSegments.max(axis=0)
+    max_cells = (activeBasalSegments + activeApicalSegments).max(axis=0)
 
     return max_cells
 
