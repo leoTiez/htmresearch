@@ -318,14 +318,15 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     # This makes sure that only segments are learnt that are active
     # Reshaping active segments for easy access per column
     segments_column_based = self._reshapeSegmentsToColumnBased(segments)
-    # segments_bursting_columns = self._reshapeSegmetsFromColumnBased(
-    #   segments_column_based[:, :, burstingColumns],
-    #   numOfColumns=burstingColumns.shape[0]
-    # )
-    # Setting the segment with the maximum value to the min threshold
     # TODO check update of values
-    segments_column_based[:, :, burstingColumns][segments_column_based.argmin(axis=0), segments_column_based.argmax(axis=1), :] = self.minThreshold
+    max_cells_ind = self._getMaxCellIndexPerColumn(segments_column_based[:, :, burstingColumns], self.cellsPerColumn)
+    segments_to_update = segments_column_based[:, max_cells_ind, burstingColumns].argmin(axis=0)
+    segments_column_based[segments_to_update, max_cells_ind, burstingColumns] = self.minThreshold
     return self._reshapeCellsFromColumnBased(segments_column_based)
+
+  @staticmethod
+  def _getMaxCellIndexPerColumn(segmentMatrix, cellsPerColumn):
+    return np.row_stack(segmentMatrix).argmax(axis=0) % cellsPerColumn
 
   def _setNonActiveSegments(self, segments, inactiveColumns):
     segments[segments < self.minThreshold] = 0.0
