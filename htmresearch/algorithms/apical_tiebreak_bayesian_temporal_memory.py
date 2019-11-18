@@ -244,26 +244,26 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     all_columns = np.arange(0, self.numberOfColumns())
     # Get all inactive columns and set their respective predicted cells to zero
     inactive_columns = np.setdiff1d(all_columns, activeColumns)
-    self.activeCells = self._reshapeCellsToColumnBased(self.predictedCells.copy())
-    self.activeCells[:, inactive_columns] = 0
+    active_cells_before_burst = self._reshapeCellsToColumnBased(self.predictedCells.copy())
+    active_cells_before_burst[:, inactive_columns] = 0
     # find bursting columns
     bursting_columns = activeColumns[np.where(
-      np.abs(self.activeCells[:, activeColumns].sum(axis=1)
+      np.abs(active_cells_before_burst[:, activeColumns].sum(axis=0)
              ) < self.minThreshold)]  # Use this because of numerical issues. Sum over all cells should be zero
                                       # If there is one active cell, the sum over all cells >= thresold
                                       # TODO consider change if normalisation is changed
-    self.activeCells = self._reshapeCellsFromColumnBased(self.activeCells)
 
     # Calculate basal segment activity after bursting
     if bursting_columns.shape[0] > 0:
       self.activeBasalSegments = self._setMaxSegmentsAfterBursting(bursting_columns, self.activeBasalSegments)
       self.activeApicalSegments = self._setMaxSegmentsAfterBursting(bursting_columns, self.activeApicalSegments)
+      # Sets bursting cells to 1 due to normalisation in the column
       self.predictedCells = self._calculatePredictedValues(self.activeBasalSegments, self.activeApicalSegments)
 
-      # Reset active cells values
-      self.activeCells = self._reshapeCellsToColumnBased(self.predictedCells.copy())
-      self.activeCells[:, inactive_columns] = 0
-      self.activeCells = self._reshapeCellsFromColumnBased(self.activeCells)
+    # Reset active cells values
+    self.activeCells = self._reshapeCellsToColumnBased(self.predictedCells.copy())
+    self.activeCells[:, inactive_columns] = 0
+    self.activeCells = self._reshapeCellsFromColumnBased(self.activeCells)
 
     # All non-active segments should be set to zero
     # All segments above the threshold could have activated the cell and hence should be included
@@ -312,6 +312,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
       self._reshapeCellsToColumnBased(predicted_cells)
       / normalisation.reshape((1, normalisation.shape[0]))
     )
+    predicted_cells[np.isnan(predicted_cells)] = 0
     # TODO when apply threshold -> experiments
     predicted_cells[predicted_cells < self.minThreshold] = 0.0
     return predicted_cells
