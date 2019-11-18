@@ -261,6 +261,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
       # Reset active cells values
       self.activeCells = self._reshapeCellsToColumnBased(self.predictedCells.copy())
       self.activeCells[:, inactive_columns] = 0
+      self.activeCells = self._reshapeCellsFromColumnBased(self.activeCells)
 
     # All non-active segments should be set to zero
     # All segments above the threshold could have activated the cell and hence should be included
@@ -322,7 +323,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     max_cells_ind = self._getMaxCellIndexPerColumn(segments_column_based[:, :, burstingColumns], self.cellsPerColumn)
     segments_to_update = segments_column_based[:, max_cells_ind, burstingColumns].argmin(axis=0)
     segments_column_based[segments_to_update, max_cells_ind, burstingColumns] = self.minThreshold
-    return self._reshapeCellsFromColumnBased(segments_column_based)
+    return self._reshapeSegmetsFromColumnBased(segments_column_based)
 
   @staticmethod
   def _getMaxCellIndexPerColumn(segmentMatrix, cellsPerColumn):
@@ -406,7 +407,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
   @staticmethod
   def _calculateSegmentActivity(weights, activeInput, bias, use_bias=True):
     # Runtime warnings for negative infinity can be ignored here
-    activation = np.log(weights.dot(activeInput))
+    activation = np.log(np.multiply(weights, activeInput)).sum(axis=2)
     return activation if not use_bias else activation + bias
 
   def _calculatePredictedCells(self, activeBasalSegments, activeApicalSegments):
