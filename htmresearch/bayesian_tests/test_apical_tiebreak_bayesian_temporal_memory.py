@@ -84,7 +84,7 @@ class BayesianTMTest(unittest.TestCase):
             ), 'Inactive cells should be set to zero')
 
         self.assertTrue(
-            np.all(
+            np.any(
                 self.btm.activeCells.reshape(
                     self.cells_per_column,
                     self.column_count
@@ -94,7 +94,7 @@ class BayesianTMTest(unittest.TestCase):
         active_cells = self.btm.activeCells.reshape(
             self.cells_per_column,
             self.column_count
-        )[:, active_columns].argmax(axis=1)
+        )[:, active_columns].argmax(axis=0)
 
         # Moving average weight
         self._movingAverageWeightsTests(
@@ -144,7 +144,7 @@ class BayesianTMTest(unittest.TestCase):
                     self.cells_per_column,
                     self.column_count,
                     input_size
-                ))[0, :, active_columns, :][active_cells, :, :] > 0.0
+                ))[0, active_cells, active_columns, :] > 0.0
             ), 'Not all weights to active segments have been updated'
         )
 
@@ -166,7 +166,7 @@ class BayesianTMTest(unittest.TestCase):
                     self.max_segments_per_cell,
                     self.cells_per_column,
                     self.column_count
-                ))[0, :, active_columns][active_cells, :] > 0.0
+                ))[0, active_cells, active_columns] > 0.0
             ), 'Not all biases to active segments have been updated'
         )
 
