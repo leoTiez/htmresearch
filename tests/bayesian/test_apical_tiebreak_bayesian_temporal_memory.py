@@ -3,10 +3,7 @@ import unittest
 import numpy as np
 
 # Import apical tiebreak bayesian tm
-import sys
-import os
-sys.path.append(os.path.realpath(os.path.join(os.getcwd(), '../algorithms')))
-import apical_tiebreak_bayesian_temporal_memory as btm
+import htmresearch.algorithms.apical_tiebreak_bayesian_temporal_memory as btm
 
 
 class BayesianTMTest(unittest.TestCase):
@@ -191,4 +188,3 @@ class BayesianTMTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
