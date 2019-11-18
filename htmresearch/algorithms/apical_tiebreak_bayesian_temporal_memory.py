@@ -199,6 +199,8 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     activation_basal = self._calculateSegmentActivity(self.basalWeights, basalInput, self.basalBias, use_bias=True)
     activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.apicalBias, use_bias=False)
 
+    activation_basal = np.exp(activation_basal)
+    activation_apical = np.exp(activation_apical)
     self.predictedCells = self._calculatePredictedValues(activation_basal, activation_apical)
     self.activeBasalSegments = activation_basal
     self.activeApicalSegments = activation_apical
@@ -305,9 +307,9 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
   def _calculatePredictedValues(self, activation_basal, activation_apical):
     predicted_cells = self._calculatePredictedCells(activation_basal, activation_apical)
-    normalisation = np.exp(self._reshapeCellsToColumnBased(predicted_cells)).sum(axis=0)
+    normalisation = self._reshapeCellsToColumnBased(predicted_cells).sum(axis=0)
     predicted_cells = self._reshapeCellsFromColumnBased(
-      np.exp(self._reshapeCellsToColumnBased(predicted_cells))
+      self._reshapeCellsToColumnBased(predicted_cells)
       / normalisation.reshape((1, normalisation.shape[0]))
     )
     # TODO when apply threshold -> experiments
