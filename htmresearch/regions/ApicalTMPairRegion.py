@@ -332,7 +332,8 @@ class ApicalTMPairRegion(PyRegion):
                maxSegmentsPerCell=255,
                maxSynapsesPerSegment=255, # ApicalTiebreakCPP only
                seed=42,
-
+               noise=0.01,  # lambda
+               learningRate=0.1,  # alpha
                # Region params
                implementation="ApicalTiebreak",
                learn=True,
@@ -359,6 +360,8 @@ class ApicalTMPairRegion(PyRegion):
     self.maxSegmentsPerCell = maxSegmentsPerCell
     self.learnOnOneCell = learnOnOneCell
     self.seed = seed
+    self.noise = noise
+    self.learningRate = learningRate
 
     # Region params
     self.implementation = implementation
