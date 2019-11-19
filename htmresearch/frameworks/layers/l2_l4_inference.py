@@ -257,7 +257,7 @@ class L4L2Experiment(object):
         "externalInputSize": externalInputSize,
         "sensorInputSize": inputSize,
         "L4RegionType": L4RegionType,
-        "L4Params": self.getBayesianL4Params(inputSize, numExternalInputBits),
+        "L4Params": self.getDefaultL4Params(inputSize, numExternalInputBits),
         "L2Params": self.getDefaultL2Params(inputSize, numInputBits),
       }
 
@@ -271,7 +271,7 @@ class L4L2Experiment(object):
           "externalInputSize": externalInputSize,
           "sensorInputSize": inputSize,
           "L4RegionType": L4RegionType,
-          "L4Params": self.getDefaultL4Params(inputSize, numExternalInputBits),
+          "L4Params": self.getBayesianL4Params(inputSize, numExternalInputBits),
           "L2Params": self.getDefaultL2Params(inputSize, numInputBits),
         }
 
@@ -892,7 +892,7 @@ class L4L2Experiment(object):
       "minThreshold": minThreshold,
       "sampleSize": sampleSize,
       "noise": 0.01,
-      "learning_rate": 0.1,
+      "learningRate": 0.1,
       "maxSegmentsPerCell": 255,
       "implementation": "ApicalTiebreak",
       "seed": self.seed
