@@ -414,7 +414,7 @@ class ApicalTMPairRegion(PyRegion):
         import sys
         sys.path.append(os.path.realpath(os.path.join(os.getcwd(), '../../htmresearch/algorithms')))
         import apical_tiebreak_bayesian_temporal_memory as btm
-        cls = btm.ApicalTiebreakBayesianTemporalMemory
+        cls = btm.BayesianApicalTiebreakPairMemory
 
       elif self.implementation == "ApicalDependent":
         params["reducedBasalThreshold"] = self.reducedBasalThreshold
