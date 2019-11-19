@@ -248,20 +248,32 @@ class L4L2Experiment(object):
     random.seed(seed)
 
     # update parameters with overrides
-    self.config = {
-      "networkType": networkType,
-      "longDistanceConnections": longDistanceConnections,
-      "enableFeedback": enableFeedback,
-      "numCorticalColumns": numCorticalColumns,
-      "externalInputSize": externalInputSize,
-      "sensorInputSize": inputSize,
-      "L4RegionType": L4RegionType,
-      "L4Params": self.getDefaultL4Params(inputSize, numExternalInputBits),
-      "L2Params": self.getDefaultL2Params(inputSize, numInputBits),
-    }
+    if implementation is None:
+      self.config = {
+        "networkType": networkType,
+        "longDistanceConnections": longDistanceConnections,
+        "enableFeedback": enableFeedback,
+        "numCorticalColumns": numCorticalColumns,
+        "externalInputSize": externalInputSize,
+        "sensorInputSize": inputSize,
+        "L4RegionType": L4RegionType,
+        "L4Params": self.getBayesianL4Params(inputSize, numExternalInputBits),
+        "L2Params": self.getDefaultL2Params(inputSize, numInputBits),
+      }
 
-    if implementation is not None:
-      self.config["L4Params"]["implementation"] = implementation
+    else:
+      if implementation is "BayesianApicalTiebreak":
+        self.config = {
+          "networkType": networkType,
+          "longDistanceConnections": longDistanceConnections,
+          "enableFeedback": enableFeedback,
+          "numCorticalColumns": numCorticalColumns,
+          "externalInputSize": externalInputSize,
+          "sensorInputSize": inputSize,
+          "L4RegionType": L4RegionType,
+          "L4Params": self.getDefaultL4Params(inputSize, numExternalInputBits),
+          "L2Params": self.getDefaultL2Params(inputSize, numInputBits),
+        }
 
     if enableLateralSP:
       self.config["lateralSPParams"] = self.getDefaultLateralSPParams(inputSize)
@@ -866,6 +878,25 @@ class L4L2Experiment(object):
       "seed": self.seed
     }
 
+  def getBayesianL4Params(self, inputSize, numInputBits):
+    """
+    Returns a good default set of parameters to use in the L4 region.
+    """
+    sampleSize = int(1.5 * numInputBits)
+    minThreshold = 0.5
+
+    return {
+      "columnCount": inputSize,
+      "cellsPerColumn": 16,
+      "learn": True,
+      "minThreshold": minThreshold,
+      "sampleSize": sampleSize,
+      "noise": 0.01,
+      "learning_rate": 0.1,
+      "maxSegmentsPerCell": 255,
+      "implementation": "ApicalTiebreak",
+      "seed": self.seed
+    }
 
   def getDefaultL2Params(self, inputSize, numInputBits):
     """
