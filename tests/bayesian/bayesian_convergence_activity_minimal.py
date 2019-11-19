@@ -49,12 +49,14 @@ def runExperiment():
   # or 3 columns
   exp3 = L4L2Experiment(
     'three_column',
+    implementation='BayesianApicalTiebreak',
     numCorticalColumns=3,
     seed=1
   )
 
   exp1 = L4L2Experiment(
     'single_column',
+    implementation='BayesianApicalTiebreak',
     numCorticalColumns=1,
     seed=1
   )
