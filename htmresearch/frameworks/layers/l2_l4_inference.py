@@ -139,7 +139,7 @@ class L4L2Experiment(object):
                L2Overrides=None,
                L4RegionType="py.ApicalTMPairRegion",
                networkType = "MultipleL4L2Columns",
-               implementation="BayesianApicalTiebreak",
+               implementation=None,
                longDistanceConnections = 0,
                maxConnectionDistance = 1,
                columnPositions = None,
