@@ -61,7 +61,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
                minThreshold=0.5,
                sampleSize=20,
                noise=0.01,  # lambda
-               learning_rate=0.1,  # alpha
+               learningRate=0.1,  # alpha
                maxSegmentsPerCell=255,
                seed=42):
     """
@@ -137,7 +137,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     self.apicalMovingAverageInput = np.zeros(self.apicalInputSize)
 
     self.noise = noise
-    self.learningRate = learning_rate
+    self.learningRate = learningRate
 
     self.rng = Random(seed)
     # Changed already to float64
