@@ -179,7 +179,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     self.basalPotentialOverlaps = np.empty(0, dtype="int32")
     self.apicalPotentialOverlaps = np.empty(0, dtype="int32")
 
-  def depolarizeCells(self, basalInput, apicalInput, learn=None):
+  def depolarizeCells(self, basalInput, apicalInput):
     """
     Calculate predictions.
 
@@ -210,10 +210,6 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
   def activateCells(self,
                     activeColumns,
-                    basalReinforceCandidates=None, # Do not delete since most likely needed for interface communication
-                    apicalReinforceCandidates=None,
-                    basalGrowthCandidates=None,
-                    apicalGrowthCandidates=None,
                     learn=True,
                     temporalLearningRate=None # Makes it possible to update moving averages while not learning
                                               # and to turn off updating moving averages
@@ -620,88 +616,77 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
 
 # TODO adapt class for the compute method which is used as a common interface
-# class ApicalTiebreakPairMemory(ApicalTiebreakTemporalMemory):
-#   """
-#   Pair memory with apical tiebreak.
-#   """
-#
-#   def compute(self,
-#               activeColumns,
-#               basalInput,
-#               apicalInput=(),
-#               basalGrowthCandidates=None,
-#               apicalGrowthCandidates=None,
-#               learn=True):
-#     """
-#     Perform one timestep. Use the basal and apical input to form a set of
-#     predictions, then activate the specified columns, then learn.
-#
-#     @param activeColumns (numpy array)
-#     List of active columns
-#
-#     @param basalInput (numpy array)
-#     List of active input bits for the basal dendrite segments
-#
-#     @param apicalInput (numpy array)
-#     List of active input bits for the apical dendrite segments
-#
-#     @param basalGrowthCandidates (numpy array or None)
-#     List of bits that the active cells may grow new basal synapses to.
-#     If None, the basalInput is assumed to be growth candidates.
-#
-#     @param apicalGrowthCandidates (numpy array or None)
-#     List of bits that the active cells may grow new apical synapses to
-#     If None, the apicalInput is assumed to be growth candidates.
-#
-#     @param learn (bool)
-#     Whether to grow / reinforce / punish synapses
-#     """
-#     activeColumns = np.asarray(activeColumns)
-#     basalInput = np.asarray(basalInput)
-#     apicalInput = np.asarray(apicalInput)
-#
-#     if basalGrowthCandidates is None:
-#       basalGrowthCandidates = basalInput
-#     basalGrowthCandidates = np.asarray(basalGrowthCandidates)
-#
-#     if apicalGrowthCandidates is None:
-#       apicalGrowthCandidates = apicalInput
-#     apicalGrowthCandidates = np.asarray(apicalGrowthCandidates)
-#
-#     self.depolarizeCells(basalInput, apicalInput, learn)
-#     self.activateCells(activeColumns, basalInput, apicalInput,
-#                        basalGrowthCandidates, apicalGrowthCandidates, learn)
-#
-#
-#   def getPredictedCells(self):
-#     """
-#     @return (numpy array)
-#     Cells that were predicted for this timestep
-#     """
-#     return self.predictedCells
-#
-#
-#   def getBasalPredictedCells(self):
-#     """
-#     @return (numpy array)
-#     Cells with active basal segments
-#     """
-#     return np.unique(
-#       self.basalConnections.mapSegmentsToCells(
-#         self.activeBasalSegments))
-#
-#
-#   def getApicalPredictedCells(self):
-#     """
-#     @return (numpy array)
-#     Cells with active apical segments
-#     """
-#     return np.unique(
-#       self.apicalConnections.mapSegmentsToCells(
-#         self.activeApicalSegments))
-#
-#
-#
+class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemory):
+  """
+  Pair memory with apical tiebreak.
+  """
+
+  def compute(self,
+              activeColumns,
+              basalInput,
+              apicalInput=(),
+              basalGrowthCandidates=None,
+              apicalGrowthCandidates=None,
+              learn=True):
+    """
+    Perform one timestep. Use the basal and apical input to form a set of
+    predictions, then activate the specified columns, then learn.
+
+    @param activeColumns (numpy array)
+    List of active columns
+
+    @param basalInput (numpy array)
+    List of active input bits for the basal dendrite segments
+
+    @param apicalInput (numpy array)
+    List of active input bits for the apical dendrite segments
+
+    @param basalGrowthCandidates (numpy array or None)
+    List of bits that the active cells may grow new basal synapses to.
+    If None, the basalInput is assumed to be growth candidates.
+
+    @param apicalGrowthCandidates (numpy array or None)
+    List of bits that the active cells may grow new apical synapses to
+    If None, the apicalInput is assumed to be growth candidates.
+
+    @param learn (bool)
+    Whether to grow / reinforce / punish synapses
+    """
+    activeColumns = np.asarray(activeColumns)
+    basalInput = np.asarray(basalInput)
+    apicalInput = np.asarray(apicalInput)
+
+    self.depolarizeCells(basalInput, apicalInput)
+    self.activateCells(activeColumns, learn=learn, temporalLearningRate=None)
+
+
+  def getPredictedCells(self):
+    """
+    @return (numpy array)
+    Cells that were predicted for this timestep
+    """
+    return self.predictedCells
+
+
+  def getBasalPredictedCells(self):
+    """
+    @return (numpy array)
+    Cells with active basal segments
+    """
+    # TODO check where this is called
+    return self.predictedCells
+
+
+  def getApicalPredictedCells(self):
+    """
+    @return (numpy array)
+    Cells with active apical segments
+    """
+    # TODO check where this is called
+    return self.predictedCells
+
+
+
 #
 # class ApicalTiebreakSequenceMemory(ApicalTiebreakTemporalMemory):
 #   """
