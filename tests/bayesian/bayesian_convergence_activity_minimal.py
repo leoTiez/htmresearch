@@ -2,8 +2,9 @@
 import random
 import matplotlib
 matplotlib.use("Agg")
-from htmresearch.frameworks.layers.l2_l4_inference import L4L2Experiment
 from htmresearch.frameworks.layers.object_machine_factory import (createObjectMachine)
+from htmresearch.frameworks.layers.l2_l4_inference import L4L2Experiment
+
 
 """
   Minimal version of the convergence_activity experiment from the htmpapers/frontiers repository.
