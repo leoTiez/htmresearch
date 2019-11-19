@@ -139,6 +139,7 @@ class L4L2Experiment(object):
                L2Overrides=None,
                L4RegionType="py.ApicalTMPairRegion",
                networkType = "MultipleL4L2Columns",
+               implementation="BayesianApicalTiebreak",
                longDistanceConnections = 0,
                maxConnectionDistance = 1,
                columnPositions = None,
@@ -258,6 +259,9 @@ class L4L2Experiment(object):
       "L4Params": self.getDefaultL4Params(inputSize, numExternalInputBits),
       "L2Params": self.getDefaultL2Params(inputSize, numInputBits),
     }
+
+    if implementation is not None:
+      self.config["L4Params"]["implementation"] = implementation
 
     if enableLateralSP:
       self.config["lateralSPParams"] = self.getDefaultLateralSPParams(inputSize)
