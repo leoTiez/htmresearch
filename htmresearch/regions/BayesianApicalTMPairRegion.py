@@ -375,6 +375,7 @@ class BayesianApicalTMPairRegion(PyRegion):
     self._tm.compute(activeColumns, basalInput, apicalInput, self.learn)
 
     # Extract the active / predicted cells and put them into binary arrays.
+    # TODO update according to bayesian framework
     outputs["activeCells"][:] = 0
     outputs["activeCells"][self._tm.getActiveCells()] = 1
     outputs["predictedCells"][:] = 0
