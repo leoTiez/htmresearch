@@ -190,24 +190,7 @@ class BayesianApicalTMPairRegion(PyRegion):
           "count": 1,
           "constraints": ""
         },
-        "activationThreshold": {
-          "description": ("If the number of active connected synapses on a "
-                          "segment is at least this threshold, the segment "
-                          "is said to be active."),
-          "accessMode": "Read",
-          "dataType": "UInt32",
-          "count": 1,
-          "constraints": ""
-        },
-        "reducedBasalThreshold": {
-          "description": ("Activation threshold of basal segments for cells "
-                          "with active apical segments (with apicalTiebreak "
-                          "implementation). "),
-          "accessMode": "Read",
-          "dataType": "UInt32",
-          "count": 1,
-          "constraints": ""
-        },
+
         "initialPermanence": {
           "description": "Initial permanence of a new synapse.",
           "accessMode": "Read",
@@ -224,11 +207,10 @@ class BayesianApicalTMPairRegion(PyRegion):
           "constraints": ""
         },
         "minThreshold": {
-          "description": ("If the number of synapses active on a segment is at "
-                          "least this threshold, it is selected as the best "
-                          "matching cell in a bursting column."),
+          "description": ("Minimal excitation of a segment required to be considered"
+                          "to be active"),
           "accessMode": "Read",
-          "dataType": "UInt32",
+          "dataType": "Real32",
           "count": 1,
           "constraints": ""
         },
@@ -238,14 +220,6 @@ class BayesianApicalTMPairRegion(PyRegion):
           "accessMode": "Read",
           "dataType": "UInt32",
           "count": 1
-        },
-        "learnOnOneCell": {
-          "description": ("If True, the winner cell for each column will be"
-                          " fixed between resets."),
-          "accessMode": "Read",
-          "dataType": "Bool",
-          "count": 1,
-          "defaultValue": "false"
         },
         "maxSynapsesPerSegment": {
           "description": "The maximum number of synapses per segment",
@@ -259,32 +233,15 @@ class BayesianApicalTMPairRegion(PyRegion):
           "dataType": "UInt32",
           "count": 1
         },
-        "permanenceIncrement": {
-          "description": ("Amount by which permanences of synapses are "
-                          "incremented during learning."),
+        "noise": {
+          "description": ("Noise added to the Bayesian learning procedure to avoid"
+                          "taking the logarithm of 0"),
           "accessMode": "Read",
           "dataType": "Real32",
           "count": 1
         },
-        "permanenceDecrement": {
-          "description": ("Amount by which permanences of synapses are "
-                          "decremented during learning."),
-          "accessMode": "Read",
-          "dataType": "Real32",
-          "count": 1
-        },
-        "basalPredictedSegmentDecrement": {
-          "description": ("Amount by which active permanences of synapses of "
-                          "previously predicted but inactive segments are "
-                          "decremented."),
-          "accessMode": "Read",
-          "dataType": "Real32",
-          "count": 1
-        },
-        "apicalPredictedSegmentDecrement": {
-          "description": ("Amount by which active permanences of synapses of "
-                          "previously predicted but inactive segments are "
-                          "decremented."),
+        "learningRate": {
+          "description": "Learning rate of the Bayesian learning rule",
           "accessMode": "Read",
           "dataType": "Real32",
           "count": 1
@@ -300,7 +257,7 @@ class BayesianApicalTMPairRegion(PyRegion):
           "accessMode": "Read",
           "dataType": "Byte",
           "count": 0,
-          "constraints": ("enum: BayesianApicalTiebreak"),
+          "constraints": "enum: BayesianApicalTiebreak",
           "defaultValue": "BayesianApicalTiebreak"
         },
       },
@@ -371,12 +328,13 @@ class BayesianApicalTMPairRegion(PyRegion):
         "initialPermanence": self.initialPermanence,
         "minThreshold": self.minThreshold,
         "sampleSize": self.sampleSize,
-        "maxSegmentsPerCell": self.maxSegmentsPerCell
-        "maxSynapsesPerSegment": self.maxSynapsesPerSegment,
+        "maxSegmentsPerCell": self.maxSegmentsPerCell,
         "seed": self.seed,
         "noise": self.noise,
         "learningRate": self.learningRate
       }
+
+      print params
 
       if self.implementation == "BayesianApicalTiebreak":
         import htmresearch.algorithms.apical_tiebreak_bayesian_temporal_memory as btm
