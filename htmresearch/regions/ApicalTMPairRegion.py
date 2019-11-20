@@ -332,8 +332,7 @@ class ApicalTMPairRegion(PyRegion):
                maxSegmentsPerCell=255,
                maxSynapsesPerSegment=255, # ApicalTiebreakCPP only
                seed=42,
-               noise=0.01,  # lambda
-               learningRate=0.1,  # alpha
+
                # Region params
                implementation="ApicalTiebreak",
                learn=True,
@@ -360,8 +359,6 @@ class ApicalTMPairRegion(PyRegion):
     self.maxSegmentsPerCell = maxSegmentsPerCell
     self.learnOnOneCell = learnOnOneCell
     self.seed = seed
-    self.noise = noise
-    self.learningRate = learningRate
 
     # Region params
     self.implementation = implementation
@@ -409,11 +406,6 @@ class ApicalTMPairRegion(PyRegion):
 
         import htmresearch.algorithms.apical_tiebreak_temporal_memory
         cls = htmresearch.algorithms.apical_tiebreak_temporal_memory.ApicalTiebreakPairMemory
-
-      elif self.implementation == "BayesianApicalTiebreak":
-        params["maxSegmentsPerCell"] = self.maxSegmentsPerCell
-        import htmresearch.algorithms.apical_tiebreak_bayesian_temporal_memory as btm
-        cls = btm.BayesianApicalTiebreakPairMemory
 
       elif self.implementation == "ApicalDependent":
         params["reducedBasalThreshold"] = self.reducedBasalThreshold
