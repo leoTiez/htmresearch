@@ -486,6 +486,8 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
     return candidateCells[onePerColumnFilter]
 
+  def getActiveCellsIndices(self):
+    return np.where(self.activeCells.reshape(-1) >= self.minThreshold)
 
   def getActiveCells(self):
     """
@@ -493,23 +495,6 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     Active cells
     """
     return self.activeCells
-
-
-  def getPredictedActiveCells(self):
-    """
-    @return (numpy array)
-    Active cells that were correctly predicted
-    """
-    return self.predictedActiveCells
-
-
-  def getWinnerCells(self):
-    """
-    @return (numpy array)
-    Cells that were selected for learning
-    """
-    return self.winnerCells
-
 
   def getActiveBasalSegments(self):
     """
@@ -583,37 +568,6 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     """
     self.sampleSize = sampleSize
 
-  def getUseApicalTieBreak(self):
-    """
-    Get whether we actually use apical tie-break.
-    @return (Bool) Whether apical tie-break is used.
-    """
-    return self.useApicalTiebreak
-
-
-  def setUseApicalTiebreak(self, useApicalTiebreak):
-    """
-    Sets whether we actually use apical tie-break.
-    @param useApicalTiebreak (Bool) Whether apical tie-break is used.
-    """
-    self.useApicalTiebreak = useApicalTiebreak
-
-
-  def getUseApicalModulationBasalThreshold(self):
-    """
-    Get whether we actually use apical modulation of basal threshold.
-    @return (Bool) Whether apical modulation is used.
-    """
-    return self.useApicalModulationBasalThreshold
-
-
-  def setUseApicalModulationBasalThreshold(self, useApicalModulationBasalThreshold):
-    """
-    Sets whether we actually use apical modulation of basal threshold.
-    @param useApicalModulationBasalThreshold (Bool) Whether apical modulation is used.
-    """
-    self.useApicalModulationBasalThreshold = useApicalModulationBasalThreshold
-
 
 # TODO adapt class for the compute method which is used as a common interface
 class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemory):
@@ -670,6 +624,9 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemory):
     self.depolarizeCells(basalInput, apicalInput)
     self.activateCells(activeColumns, learn=learn, temporalLearningRate=None)
 
+
+  def getPredictedCellsIndices(self):
+    return np.where(self.predictedCells.reshape(-1) >= self.minThreshold)
 
   def getPredictedCells(self):
     """
