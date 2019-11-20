@@ -51,6 +51,7 @@ def runExperiment():
   exp3 = L4L2Experiment(
     'three_column',
     implementation='BayesianApicalTiebreak',
+    L4RegionType="py.BayesianApicalTMPairRegion",
     numCorticalColumns=3,
     seed=1
   )
@@ -58,6 +59,7 @@ def runExperiment():
   exp1 = L4L2Experiment(
     'single_column',
     implementation='BayesianApicalTiebreak',
+    L4RegionType="py.BayesianApicalTMPairRegion",
     numCorticalColumns=1,
     seed=1
   )
