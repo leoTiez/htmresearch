@@ -152,7 +152,8 @@ class L4L2Experiment(object):
                enableFeedForwardSP=False,
                feedForwardSPOverrides=None,
                objectNamesAreIndices=False,
-               enableFeedback=True
+               enableFeedback=True,
+               maxSegmentsPerCell=10,
                ):
     """
     Creates the network.
@@ -274,6 +275,7 @@ class L4L2Experiment(object):
           "L4Params": self.getBayesianL4Params(inputSize, numExternalInputBits),
           "L2Params": self.getDefaultL2Params(inputSize, numInputBits),
         }
+        self.config["L4Params"]["maxSegmentsPerCell"] = maxSegmentsPerCell
 
     if enableLateralSP:
       self.config["lateralSPParams"] = self.getDefaultLateralSPParams(inputSize)
