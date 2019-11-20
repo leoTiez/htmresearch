@@ -654,6 +654,19 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemory):
     basalInput = np.asarray(basalInput)
     apicalInput = np.asarray(apicalInput)
 
+    # Special case if indices of active values are passed
+    if basalInput.shape[0] < self.basalInputSize:
+      if basalInput.dtype == np.int64:
+        basalInput_temp = np.zeros(self.basalInputSize)
+        basalInput_temp[basalInput] = 1.0
+        basalInput = basalInput_temp
+
+    if apicalInput.shape[0] < self.apicalInputSize:
+      if apicalInput.dtype == np.int64:
+        apicalInput_temp = np.zeros(self.apicalInputSize)
+        apicalInput_temp[apicalInput] = 1.0
+        apicalInput = apicalInput_temp
+
     self.depolarizeCells(basalInput, apicalInput)
     self.activateCells(activeColumns, learn=learn, temporalLearningRate=None)
 
