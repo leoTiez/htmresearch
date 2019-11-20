@@ -894,7 +894,7 @@ class L4L2Experiment(object):
       "noise": 0.01,
       "learningRate": 0.1,
       "maxSegmentsPerCell": 255,
-      "implementation": "ApicalTiebreak",
+      "implementation": "BayesianApicalTiebreak",
       "seed": self.seed
     }
 
