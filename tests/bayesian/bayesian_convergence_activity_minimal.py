@@ -53,6 +53,7 @@ def runExperiment():
     implementation='BayesianApicalTiebreak',
     L4RegionType="py.BayesianApicalTMPairRegion",
     numCorticalColumns=3,
+    maxSegmentsPerCell=3,
     seed=1
   )
 
@@ -61,6 +62,7 @@ def runExperiment():
     implementation='BayesianApicalTiebreak',
     L4RegionType="py.BayesianApicalTMPairRegion",
     numCorticalColumns=1,
+    maxSegmentsPerCell=3,
     seed=1
   )
 
