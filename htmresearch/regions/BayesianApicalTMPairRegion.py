@@ -334,8 +334,6 @@ class BayesianApicalTMPairRegion(PyRegion):
         "learningRate": self.learningRate
       }
 
-      print params
-
       if self.implementation == "BayesianApicalTiebreak":
         import htmresearch.algorithms.apical_tiebreak_bayesian_temporal_memory as btm
         cls = btm.BayesianApicalTiebreakPairMemory
