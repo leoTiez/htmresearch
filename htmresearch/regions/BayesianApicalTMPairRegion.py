@@ -20,7 +20,7 @@
 # ----------------------------------------------------------------------
 
 """
-Region for Temporal Memory with various apical implementations.
+Region for Temporal Memory with various Bayesian apical implementations.
 """
 
 import numpy as np
@@ -29,7 +29,7 @@ from nupic.bindings.regions.PyRegion import PyRegion
 
 
 
-class ApicalTMPairRegion(PyRegion):
+class BayesianApicalTMPairRegion(PyRegion):
   """
   Implements pair memory with the TM for the HTM network API. The temporal
   memory uses basal and apical dendrites.
@@ -42,7 +42,7 @@ class ApicalTMPairRegion(PyRegion):
     """
 
     spec = {
-      "description": ApicalTMPairRegion.__doc__,
+      "description": BayesianApicalTMPairRegion.__doc__,
       "singleNodeOnly": True,
       "inputs": {
         "activeColumns": {
@@ -300,8 +300,8 @@ class ApicalTMPairRegion(PyRegion):
           "accessMode": "Read",
           "dataType": "Byte",
           "count": 0,
-          "constraints": ("enum: ApicalTiebreak, ApicalTiebreakCPP, ApicalDependent"),
-          "defaultValue": "ApicalTiebreakCPP"
+          "constraints": ("enum: BayesianApicalTiebreak"),
+          "defaultValue": "BayesianApicalTiebreak"
         },
       },
     }
@@ -318,24 +318,16 @@ class ApicalTMPairRegion(PyRegion):
 
                # TM params
                cellsPerColumn=32,
-               activationThreshold=13,
                initialPermanence=0.21,
-               connectedPermanence=0.50,
-               minThreshold=10,
-               reducedBasalThreshold=13, # ApicalTiebreak and ApicalDependent only
+               minThreshold=0.5,
                sampleSize=20,
-               permanenceIncrement=0.10,
-               permanenceDecrement=0.10,
-               basalPredictedSegmentDecrement=0.0,
-               apicalPredictedSegmentDecrement=0.0,
-               learnOnOneCell=False, # ApicalTiebreakCPP only
                maxSegmentsPerCell=255,
-               maxSynapsesPerSegment=255, # ApicalTiebreakCPP only
+               maxSynapsesPerSegment=255,
                seed=42,
                noise=0.01,  # lambda
                learningRate=0.1,  # alpha
                # Region params
-               implementation="ApicalTiebreak",
+               implementation="BayesianApicalTiebreak",
                learn=True,
                **kwargs):
 
@@ -346,19 +338,11 @@ class ApicalTMPairRegion(PyRegion):
 
     # TM params
     self.cellsPerColumn = cellsPerColumn
-    self.activationThreshold = activationThreshold
-    self.reducedBasalThreshold = reducedBasalThreshold
     self.initialPermanence = initialPermanence
-    self.connectedPermanence = connectedPermanence
     self.minThreshold = minThreshold
     self.sampleSize = sampleSize
-    self.permanenceIncrement = permanenceIncrement
-    self.permanenceDecrement = permanenceDecrement
-    self.basalPredictedSegmentDecrement = basalPredictedSegmentDecrement
-    self.apicalPredictedSegmentDecrement = apicalPredictedSegmentDecrement
-    self.maxSynapsesPerSegment = maxSynapsesPerSegment
     self.maxSegmentsPerCell = maxSegmentsPerCell
-    self.learnOnOneCell = learnOnOneCell
+    self.maxSynapsesPerSegment = maxSynapsesPerSegment
     self.seed = seed
     self.noise = noise
     self.learningRate = learningRate
@@ -384,42 +368,19 @@ class ApicalTMPairRegion(PyRegion):
         "basalInputSize": self.basalInputWidth,
         "apicalInputSize": self.apicalInputWidth,
         "cellsPerColumn": self.cellsPerColumn,
-        "activationThreshold": self.activationThreshold,
         "initialPermanence": self.initialPermanence,
-        "connectedPermanence": self.connectedPermanence,
         "minThreshold": self.minThreshold,
         "sampleSize": self.sampleSize,
-        "permanenceIncrement": self.permanenceIncrement,
-        "permanenceDecrement": self.permanenceDecrement,
-        "basalPredictedSegmentDecrement": self.basalPredictedSegmentDecrement,
-        "apicalPredictedSegmentDecrement": self.apicalPredictedSegmentDecrement,
+        "maxSegmentsPerCell": self.maxSegmentsPerCell
         "maxSynapsesPerSegment": self.maxSynapsesPerSegment,
         "seed": self.seed,
+        "noise": self.noise,
+        "learningRate": self.learningRate
       }
 
-      if self.implementation == "ApicalTiebreakCPP":
-        params["learnOnOneCell"] = self.learnOnOneCell
-        params["maxSegmentsPerCell"] = self.maxSegmentsPerCell
-
-        import htmresearch_core.experimental
-        cls = htmresearch_core.experimental.ApicalTiebreakPairMemory
-
-      elif self.implementation == "ApicalTiebreak":
-        params["reducedBasalThreshold"] = self.reducedBasalThreshold
-
-        import htmresearch.algorithms.apical_tiebreak_temporal_memory
-        cls = htmresearch.algorithms.apical_tiebreak_temporal_memory.ApicalTiebreakPairMemory
-
-      elif self.implementation == "BayesianApicalTiebreak":
-        params["maxSegmentsPerCell"] = self.maxSegmentsPerCell
+      if self.implementation == "BayesianApicalTiebreak":
         import htmresearch.algorithms.apical_tiebreak_bayesian_temporal_memory as btm
         cls = btm.BayesianApicalTiebreakPairMemory
-
-      elif self.implementation == "ApicalDependent":
-        params["reducedBasalThreshold"] = self.reducedBasalThreshold
-
-        import htmresearch.algorithms.apical_dependent_temporal_memory
-        cls = htmresearch.algorithms.apical_dependent_temporal_memory.TripleMemory
 
       else:
         raise ValueError("Unrecognized implementation %s" % self.implementation)
@@ -455,18 +416,7 @@ class ApicalTMPairRegion(PyRegion):
     else:
       apicalInput = np.empty(0, dtype="uint32")
 
-    if "basalGrowthCandidates" in inputs:
-      basalGrowthCandidates = inputs["basalGrowthCandidates"].nonzero()[0]
-    else:
-      basalGrowthCandidates = basalInput
-
-    if "apicalGrowthCandidates" in inputs:
-      apicalGrowthCandidates = inputs["apicalGrowthCandidates"].nonzero()[0]
-    else:
-      apicalGrowthCandidates = apicalInput
-
-    self._tm.compute(activeColumns, basalInput, apicalInput,
-                     basalGrowthCandidates, apicalGrowthCandidates, self.learn)
+    self._tm.compute(activeColumns, basalInput, apicalInput, self.learn)
 
     # Extract the active / predicted cells and put them into binary arrays.
     outputs["activeCells"][:] = 0
