@@ -377,8 +377,8 @@ class BayesianApicalTMPairRegion(PyRegion):
     # Extract the active / predicted cells and put them into binary arrays.
     # TODO update according to bayesian framework
     outputs["activeCells"][:] = 0
-    outputs["activeCells"][self._tm.getActiveCellsIndices()] = self._tm.getActiveCells()
-    print outputs["activeCells"][self._tm.getActiveCellsIndices()]
+    outputs["activeCells"][self._tm.getActiveCellsIndices()] = \
+      self._tm.getActiveCells()[self._tm.getActiveCellsIndices()]
     outputs["predictedCells"][:] = 0
     outputs["predictedCells"][
       self._tm.getPredictedCellsIndices()] = self._tm.getPredictedCells()
@@ -386,7 +386,8 @@ class BayesianApicalTMPairRegion(PyRegion):
                                           outputs["predictedCells"])
     # Treat winner and active cells the same way
     outputs["winnerCells"][:] = 0
-    outputs["winnerCells"][self._tm.getActiveCellsIndices()] = self._tm.getActiveCells()
+    outputs["winnerCells"][self._tm.getActiveCellsIndices()] =\
+      self._tm.getActiveCells()[self._tm.getActiveCellsIndices()]
 
 
   def getParameter(self, parameterName, index=-1):
