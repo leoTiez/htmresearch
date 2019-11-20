@@ -625,8 +625,6 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemory):
               activeColumns,
               basalInput,
               apicalInput=(),
-              basalGrowthCandidates=None,
-              apicalGrowthCandidates=None,
               learn=True):
     """
     Perform one timestep. Use the basal and apical input to form a set of
