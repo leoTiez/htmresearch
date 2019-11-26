@@ -38,7 +38,7 @@ def registerAllResearchRegions():
   for regionName in ["TemporalPoolerRegion",
                      "ApicalTMPairRegion", "ApicalTMSequenceRegion",
                      "RawSensor", "ColumnPoolerRegion",
-                     "CoordinateSensorRegion"]:
+                     "CoordinateSensorRegion", "BayesianApicalTMPairRegion"]:
     registerResearchRegion(regionName)
 
 
