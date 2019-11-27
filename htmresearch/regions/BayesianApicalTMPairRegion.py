@@ -375,19 +375,21 @@ class BayesianApicalTMPairRegion(PyRegion):
     self._tm.compute(activeColumns, basalInput, apicalInput, self.learn)
 
     # Extract the active / predicted cells and put them into binary arrays.
-    # TODO update according to bayesian framework
+    activeCellsIndices = self._tm.getActiveCellsIndices()
+    predictedCellsIndices = self._tm.getPredictedCellsIndices()
+    activeCellsValues = self._tm.getActiveCellsValues()
+    predictedCellsValues = self._tm.getPredictedCellsValues()
+    predictedActivatedIndices = np.intersect1d(activeCellsIndices, predictedCellsIndices)
     outputs["activeCells"][:] = 0
-    outputs["activeCells"][self._tm.getActiveCellsIndices()] = \
-      self._tm.getActiveCells()[self._tm.getActiveCellsIndices()]
+    outputs["activeCells"][activeCellsIndices] = activeCellsValues[activeCellsIndices]
     outputs["predictedCells"][:] = 0
-    outputs["predictedCells"][
-      self._tm.getPredictedCellsIndices()] = self._tm.getPredictedCells()
-    outputs["predictedActiveCells"][:] = (outputs["activeCells"] *
-                                          outputs["predictedCells"])
+    outputs["predictedCells"][predictedCellsIndices] = predictedCellsValues[predictedCellsIndices]
+    outputs["predictedActiveCells"][:] = 0
+    outputs["predictedActiveCells"][predictedActivatedIndices] = activeCellsValues[predictedActivatedIndices]
+    # (outputs["activeCells"] * outputs["predictedCells"])
     # Treat winner and active cells the same way
     outputs["winnerCells"][:] = 0
-    outputs["winnerCells"][self._tm.getActiveCellsIndices()] =\
-      self._tm.getActiveCells()[self._tm.getActiveCellsIndices()]
+    outputs["winnerCells"][activeCellsIndices] = activeCellsValues[activeCellsIndices]
 
 
   def getParameter(self, parameterName, index=-1):
