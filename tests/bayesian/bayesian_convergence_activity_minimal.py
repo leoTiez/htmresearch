@@ -17,11 +17,11 @@ def runExperiment():
   We will run two experiments side by side, with either single column
   or 3 columns
   """
-  numColumns = 3
+  numColumns = 1 # 3
   numFeatures = 3
   numPoints = 10
   numLocations = 10
-  numObjects = 10
+  numObjects = 2 # 10
   numRptsPerSensation = 2
 
   objectMachine = createObjectMachine(
@@ -29,7 +29,7 @@ def runExperiment():
     numInputBits=20,
     sensorInputSize=1024,
     externalInputSize=1024,
-    numCorticalColumns=3,
+    numCorticalColumns=numColumns,
     seed=40,
   )
   objectMachine.createRandomObjects(numObjects, numPoints=numPoints,
@@ -46,30 +46,31 @@ def runExperiment():
       featureLocations.append({0: objects[i][j][0]})
     objectsSingleColumn[i] = featureLocations
 
+  maxNumSegemnts = 2
   # we will run two experiments side by side, with either single column
   # or 3 columns
-  exp3 = L4L2Experiment(
-    'three_column',
-    implementation='BayesianApicalTiebreak',
-    L4RegionType="py.BayesianApicalTMPairRegion",
-    numCorticalColumns=3,
-    maxSegmentsPerCell=2,
-    seed=1
-  )
+  # exp3 = L4L2Experiment(
+  #   'three_column',
+  #   implementation='BayesianApicalTiebreak',
+  #   L4RegionType="py.BayesianApicalTMPairRegion",
+  #   numCorticalColumns=3,
+  #   maxSegmentsPerCell=5,
+  #   seed=1
+  # )
 
   exp1 = L4L2Experiment(
     'single_column',
     implementation='BayesianApicalTiebreak',
     L4RegionType="py.BayesianApicalTMPairRegion",
     numCorticalColumns=1,
-    maxSegmentsPerCell=2,
+    maxSegmentsPerCell=maxNumSegemnts,
     seed=1
   )
 
   print "train single column "
   exp1.learnObjects(objectsSingleColumn)
-  print "train multi-column "
-  exp3.learnObjects(objects)
+  # print "train multi-column "
+  # exp3.learnObjects(objects)
 
   # test on the first object
   objectId = 0
@@ -100,17 +101,17 @@ def runExperiment():
     sensationStepsMultiColumn.append(sdrs)
     sensationStepsSingleColumn.append({0: sdrs[0]})
 
-  print "inference: multi-columns "
-  exp3.sendReset()
-  l2ActiveCellsMultiColumn = []
-  L2ActiveCellNVsTimeMultiColumn = []
-  for sensation in sensationStepsMultiColumn:
-    exp3.infer([sensation], objectName=objectId, reset=False)
-    l2ActiveCellsMultiColumn.append(exp3.getL2Representations())
-    activeCellNum = 0
-    for c in range(numColumns):
-      activeCellNum += len(exp3.getL2Representations()[c])
-    L2ActiveCellNVsTimeMultiColumn.append(activeCellNum / numColumns)
+  # print "inference: multi-columns "
+  # exp3.sendReset()
+  # l2ActiveCellsMultiColumn = []
+  # L2ActiveCellNVsTimeMultiColumn = []
+  # for sensation in sensationStepsMultiColumn:
+  #   exp3.infer([sensation], objectName=objectId, reset=False)
+  #   l2ActiveCellsMultiColumn.append(exp3.getL2Representations())
+  #   activeCellNum = 0
+  #   for c in range(numColumns):
+  #     activeCellNum += len(exp3.getL2Representations()[c])
+  #   L2ActiveCellNVsTimeMultiColumn.append(activeCellNum / numColumns)
 
   print "inference: single column "
   exp1.sendReset()
@@ -118,8 +119,20 @@ def runExperiment():
   L2ActiveCellNVsTimeSingleColumn = []
   for sensation in sensationStepsSingleColumn:
     exp1.infer([sensation], objectName=objectId, reset=False)
-    l2ActiveCellsSingleColumn.append(exp1.getL2Representations())
-    L2ActiveCellNVsTimeSingleColumn.append(len(exp1.getL2Representations()[0]))
+    rep = exp1.getL2Representations()
+    l2ActiveCellsSingleColumn.append(rep)
+    print "\n\nRepresentation", rep
+    print "Length Representation", len(rep[0])
+    L2ActiveCellNVsTimeSingleColumn.append(len(rep[0]))
+
+  # Used to figure out where to put the red rectangle!
+  sdrSize = exp1.config["L2Params"]["sdrSize"]
+  singleColumnHighlight = next(
+    (idx for idx, value in enumerate(l2ActiveCellsSingleColumn)
+     if len(value[0]) == sdrSize), None)
+
+  print "SDR size", sdrSize
+  print singleColumnHighlight
 
 if __name__ == "__main__":
   runExperiment()
