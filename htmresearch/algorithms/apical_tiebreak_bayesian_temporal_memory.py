@@ -531,6 +531,9 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
     return candidateCells[onePerColumnFilter]
 
+  def getActiveCellsValues(self):
+    return self.activeCells
+
   def getActiveCellsIndices(self):
     return np.where(self.activeCells.reshape(-1) >= self.minThreshold)
 
@@ -539,7 +542,8 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     @return (numpy array)
     Active cells
     """
-    return self.activeCells
+    return self.getActiveCellsIndices()
+    # return self.activeCells
 
   def getActiveBasalSegments(self):
     """
@@ -547,7 +551,6 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     Active basal segments for this timestep
     """
     return self.activeBasalSegments
-
 
   def getActiveApicalSegments(self):
     """
@@ -670,6 +673,9 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemory):
     self.activateCells(activeColumns, learn=learn, temporalLearningRate=None)
 
 
+  def getPredictedCellsValues(self):
+    return self.predictedCells
+
   def getPredictedCellsIndices(self):
     return np.where(self.predictedCells.reshape(-1) >= self.minThreshold)
 
@@ -678,7 +684,8 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemory):
     @return (numpy array)
     Cells that were predicted for this timestep
     """
-    return self.predictedCells
+    return self.getPredictedCellsIndices()
+    # return self.predictedCells
 
 
   def getBasalPredictedCells(self):
@@ -687,7 +694,8 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemory):
     Cells with active basal segments
     """
     # TODO check where this is called
-    return self.predictedCells
+    return self.getPredictedCellsIndices()
+    # return self.predictedCells
 
 
   def getApicalPredictedCells(self):
@@ -696,7 +704,8 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemory):
     Cells with active apical segments
     """
     # TODO check where this is called
-    return self.predictedCells
+    return self.getPredictedCellsIndices()
+    # return self.predictedCells
 
 
 
