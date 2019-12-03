@@ -21,7 +21,7 @@
 
 import numpy as np
 
-from nupic.bindings.math import SparseMatrix, Random
+from nupic.bindings.math import Random
 
 
 
@@ -44,7 +44,7 @@ class ColumnPooler(object):
                # Proximal
                # synPermProximalInc=0.1,
                # synPermProximalDec=0.001,
-               initialProximalPermanence=0.6,
+               # initialProximalPermanence=0.6,
                sampleSizeProximal=20,
                # minThresholdProximal= 10,
                # connectedPermanenceProximal=0.50,
@@ -53,13 +53,13 @@ class ColumnPooler(object):
                # Distal
                # synPermDistalInc=0.1,
                # synPermDistalDec=0.001,
-               initialDistalPermanence=0.6,
+               # initialDistalPermanence=0.6,
                sampleSizeDistal=20,
                # activationThresholdDistal=13,
                # connectedPermanenceDistal=0.50,
                inertiaFactor=1.,
 
-               # Baysian
+               # Bayesian
                noise=0.01,  # lambda
                learningRate=0.1,  # alpha
                activationThreshold=0.5, # probability such that a cell becomes active
@@ -155,6 +155,7 @@ class ColumnPooler(object):
     assert minSdrSize is None or minSdrSize <= sdrSize
 
     self.inputWidth = inputWidth
+    self.lateralInputWidths = lateralInputWidths
     self.cellCount = cellCount
     self.sdrSize = sdrSize
     if maxSdrSize is None:
@@ -165,41 +166,42 @@ class ColumnPooler(object):
       self.minSdrSize = sdrSize
     else:
       self.minSdrSize = minSdrSize
-    self.initialProximalPermanence = initialProximalPermanence
     self.sampleSizeProximal = sampleSizeProximal
-    self.initialDistalPermanence = initialDistalPermanence
     self.sampleSizeDistal = sampleSizeDistal
     self.inertiaFactor = inertiaFactor
 
-    self.activeCells = np.empty(0, dtype="float64")
+    self.activeCells = np.zeros(self.cellCount, dtype="float64")
     self._random = Random(seed)
     self.useInertia=True
 
-    # Baysian parameters (weights, bias, moving averages)
+    # Bayesian parameters (weights, bias, moving averages)
     # Each row represents one segment on a cell, so each cell potentially has
     # 1 proximal segment and 1+len(lateralInputWidths) distal segments.
 
     # Weights 2D-Matrix - (1 segment per) cells x distalInput +1 (include bias)
     # Needs to be split up, because each segment only connects to the specified input
-    self.distalWeights = tuple(np.zeros((self.cellCount, n+1))
-                               for n in lateralInputWidths)
+    self.distalWeights = list(np.zeros((self.cellCount, n+1)) for n in lateralInputWidths)
     self.internalDistalWeights = np.zeros((self.cellCount, self.cellCount+1))
     self.proximalWeights = np.zeros((self.cellCount, self.inputWidth+1))
 
     # Initialise weights to first segment randomly TODO check whether this is necessary. (commented out)
-    # TODO: Include bias in initialization, movingAverageInput ?
     # for d in self.distalWeights:
     #   d[:, :] = np.random.random(d[:, :].shape)
     # self.internalDistalWeights[:, :] = np.random.random(self.internalDistalWeights[:, :].shape)
     # self.proximalWeights[:, :] = np.random.random(self.proximalWeights[:, :].shape)
 
-    self.distalMovingAverages = tuple(np.zeros((self.cellCount, n+1)) for n in lateralInputWidths)
-    self.interalDistalMovingAverages = np.zeros(self.cellCount, self.cellCount+1)
-    self.proximalMovingAverages = np.zeros(self.cellCount, self.inputWidth+1)
+    self.distalMovingAverages = list(np.zeros((self.cellCount, n)) for n in lateralInputWidths)
+    self.internalDistalMovingAverages = np.zeros((self.cellCount, self.cellCount))
+    self.proximalMovingAverages = np.zeros((self.cellCount, self.inputWidth))
 
-    self.distalMovingAverageInput = tuple(np.zeros(n) for n in lateralInputWidths)
-    self.distalMovingAverageInput = np.zeros(self.cellCount+1)
-    self.distalMovingAverageInput = np.zeros(self.inputWidth+1)
+    # TODO: Separate bias per cell context needed?
+    self.distalMovingAverageBias = list(np.zeros(self.cellCount) for n in lateralInputWidths)
+    self.internalDistalMovingAverageBias = np.zeros(self.cellCount)
+    self.proximalMovingAverageBias = np.zeros(self.cellCount)
+
+    self.distalMovingAverageInput = list(np.zeros(n) for n in lateralInputWidths)
+    self.internalDistalMovingAverageInput = np.zeros(self.cellCount)
+    self.proximalMovingAverageInput = np.zeros(self.inputWidth)
 
     self.noise = noise
     self.learningRate = learningRate
@@ -243,8 +245,13 @@ class ColumnPooler(object):
                                 feedforwardGrowthCandidates)
 
 
-  def _computeLearningMode(self, feedforwardInput, lateralInputs,
-                                 feedforwardGrowthCandidates):
+  def _computeLearningMode(self,
+                           feedforwardInput,
+                           lateralInputs,
+                           feedforwardGrowthCandidates,
+                           temporalLearningRate=None  # Makes it possible to update moving averages while not learning
+                                                      # and to turn off updating moving averages
+                           ):
     """
     Learning mode: we are learning a new object in an online fashion. If there
     is no prior activity, we randomly activate 'sdrSize' cells and create
@@ -276,40 +283,67 @@ class ColumnPooler(object):
     # create a new SDR and learn on it.
     # This case is the only way different object representations are created.
     # enforce the active cells in the output layer
-    if len(self.activeCells) < self.minSdrSize:
-      self.activeCells = _sampleRange(self._random,
-                                      0, self.numberOfCells(),
-                                      step=1, k=self.sdrSize)
-      self.activeCells.sort()
+    if self.numberOfActiveCells() < self.minSdrSize:
+      # Randomly activate sdrSize bits from an array with cellCount bits
+      self.activeCells = _randomActivation(self.cellCount, self.sdrSize)
 
+    # Update moving averages -> could be extended to be updated in inference mode too
+    self.proximalMovingAverages, \
+    self.proximalMovingAverageBias,\
+    self.proximalMovingAverageInput = self._updateMovingAverage(
+      self.activeCells,
+      self.proximalMovingAverages,
+      self.proximalMovingAverageBias,
+      self.proximalMovingAverageInput,
+      feedforwardInput,
+      self.inputWidth,
+      temporalLearningRate,
+    )
+
+    for i, lateralInput in enumerate(lateralInputs):
+      self.distalMovingAverages[i], \
+      self.distalMovingAverageBias[i],\
+      self.distalMovingAverageInput[i] = self._updateMovingAverage(
+        self.activeCells,
+        self.distalMovingAverages[i],
+        self.distalMovingAverageBias[i],
+        self.distalMovingAverageInput[i],
+        lateralInput,
+        self.lateralInputWidths[i],
+        temporalLearningRate,
+      )
+
+    self.internalDistalMovingAverages, \
+    self.internalDistalMovingAverageBias, \
+    self.internalDistalMovingAverageInput = self._updateMovingAverage(
+      self.activeCells,
+      self.internalDistalMovingAverages,
+      self.internalDistalMovingAverageBias,
+      self.internalDistalMovingAverageInput,
+      self.activeCells,
+      self.cellCount,
+      temporalLearningRate,
+    )
+
+
+
+    # Learning
     # If we have a union of cells active, don't learn.  This primarily affects
     # online learning.
-    if len(self.activeCells) > self.maxSdrSize:
+    if self.numberOfActiveCells() > self.maxSdrSize:
       return
 
     # Finally, now that we have decided which cells we should be learning on, do
     # the actual learning.
     if len(feedforwardInput) > 0:
-      self._learn(self.proximalPermanences, self._random,
-                  self.activeCells, feedforwardInput,
-                  feedforwardGrowthCandidates, self.sampleSizeProximal,
-                  self.initialProximalPermanence, self.synPermProximalInc,
-                  self.synPermProximalDec, self.connectedPermanenceProximal)
+      self.proximalWeights = self._learn(self.proximalMovingAverages, self.proximalMovingAverageBias, self.proximalMovingAverageInput)
 
       # External distal learning
       for i, lateralInput in enumerate(lateralInputs):
-        self._learn(self.distalPermanences[i], self._random,
-                    self.activeCells, lateralInput, lateralInput,
-                    self.sampleSizeDistal, self.initialDistalPermanence,
-                    self.synPermDistalInc, self.synPermDistalDec,
-                    self.connectedPermanenceDistal)
+        self.distalWeights[i] = self._learn(self.distalMovingAverages[i], self.distalMovingAverageBias[i], self.distalMovingAverageInput[i])
 
       # Internal distal learning
-      self._learn(self.internalDistalPermanences, self._random,
-                  self.activeCells, prevActiveCells, prevActiveCells,
-                  self.sampleSizeDistal, self.initialDistalPermanence,
-                  self.synPermDistalInc, self.synPermDistalDec,
-                  self.connectedPermanenceDistal)
+      self.internalDistalWeights = self._learn(self.internalDistalMovingAverages, self.internalDistalMovingAverageBias, self.internalDistalMovingAverageInput)
 
 
   def _computeInferenceMode(self, feedforwardInput, lateralInputs):
@@ -331,6 +365,20 @@ class ColumnPooler(object):
     """
 
     prevActiveCells = self.activeCells
+
+    # # Calculate the feedforward supported cells
+    # input = np.append(feedforwardInput, 1) # include bias term
+    # feedForwardActivation = np.multiply(self.proximalWeights, input).sum(axis=1)
+    #
+    # # Calculate the number of lateral support on each cell
+    # internalDistalActivation = np.multiply(self.internalDistalWeights, prevActiveCells).sum(axis=1)
+    # lateralSupport = internalDistalActivation
+    # for i, lateralInput in enumerate(lateralInputs):
+    #   distalActivation = np.multiply(self.distalWeights[i], lateralInput).sum(axis=1)
+    #   lateralSupport *= distalActivation  # TODO: SUM, MULTIPLY OR AVG?
+    #
+    #
+    # support = feedForwardActivation * lateralSupport
 
     # Calculate the feedforward supported cells
     overlaps = self.proximalPermanences.rightVecSumAtNZGteThresholdSparse(
@@ -437,14 +485,19 @@ class ColumnPooler(object):
     """
     return self.cellCount
 
+  def numberOfActiveCells(self):
+    return sum(self.activeCells > self.activationThreshold)
+
+  def getActiveCellsIndices(self):
+    # np.where returns tuple for all dimensions -> return array of fist dimension
+    return np.where(self.activeCells >= self.activationThreshold)[0]
 
   def getActiveCells(self):
     """
     Returns the indices of the active cells.
     @return (list) Indices of active cells.
     """
-    return self.activeCells
-
+    return self.getActiveCellsIndices()
 
   def numberOfConnectedProximalSynapses(self, cells=None):
     """
@@ -554,7 +607,7 @@ class ColumnPooler(object):
     Reset internal states. When learning this signifies we are to learn a
     unique new object.
     """
-    self.activeCells = np.empty(0, dtype="uint32")
+    self.activeCells = np.zeros(self.cellCount, dtype="float64")
 
   def getUseInertia(self):
     """
@@ -574,79 +627,73 @@ class ColumnPooler(object):
     """
     self.useInertia = useInertia
 
+
+  def _updateMovingAverage(
+          self,
+          cells,
+          movingAverage,
+          movingAverageBias,
+          movingAverageInput,
+          inputValues,
+          inputSize,
+          learningRate,
+  ):
+    if learningRate is None:
+      learningRate = self.learningRate
+
+    # Updating moving average weights to input
+    noisy_connection_matrix = np.outer((1 - self.noise**2) * cells, inputValues)
+    # Consider only active segments
+    noisy_connection_matrix[noisy_connection_matrix > 0] += self.noise**2
+    noisy_connection_matrix = noisy_connection_matrix.reshape(self.cellCount, inputSize)
+    movingAverage += learningRate * (
+            noisy_connection_matrix - movingAverage
+    )
+
+    # Updating moving average bias activity
+    noisy_input_vector = (1 - self.noise) * cells
+    # Consider only active segments
+    noisy_input_vector[noisy_input_vector > 0] += self.noise
+    movingAverageBias += learningRate * (
+            noisy_input_vector - movingAverageBias
+    )
+
+    # Updating moving average input activity
+    noisy_input_vector = (1 - self.noise) * inputValues
+    # Consider only active segments
+    noisy_input_vector[noisy_input_vector > 0] += self.noise
+    movingAverageInput += learningRate * (
+            noisy_input_vector - movingAverageInput
+    )
+    return movingAverage, movingAverageBias, movingAverageInput
+
+
   @staticmethod
-  def _learn(# mutated args
-             permanences, rng,
+  def _learn(movingAverages, movingAverageBias, movingAveragesInput):
+    weights = movingAverages / np.outer(
+      movingAverageBias,
+      movingAveragesInput
+    )
+    # set division by zero to zero since this represents unused segments
+    weights[np.isnan(weights)] = 0
 
-             # activity
-             activeCells, activeInput, growthCandidateInput,
+    # Unused segments are set to -inf. That is desired since we take the exp function for the activation
+    # exp(-inf) = 0 what is the desired outcome
+    bias = np.log(movingAverageBias).reshape(1, movingAverageBias.shape[0])
+    weights = np.concatenate((weights, bias.T), axis=1)
 
-             # configuration
-             sampleSize, initialPermanence, permanenceIncrement,
-             permanenceDecrement, connectedPermanence):
-    """
-    For each active cell, reinforce active synapses, punish inactive synapses,
-    and grow new synapses to a subset of the active input bits that the cell
-    isn't already connected to.
-
-    Parameters:
-    ----------------------------
-    @param  permanences (SparseMatrix)
-            Matrix of permanences, with cells as rows and inputs as columns
-
-    @param  rng (Random)
-            Random number generator
-
-    @param  activeCells (sorted sequence)
-            Sorted list of the cells that are learning
-
-    @param  activeInput (sorted sequence)
-            Sorted list of active bits in the input
-
-    @param  growthCandidateInput (sorted sequence)
-            Sorted list of active bits in the input that the activeCells may
-            grow new synapses to
-
-    For remaining parameters, see the __init__ docstring.
-    """
-
-    permanences.incrementNonZerosOnOuter(
-      activeCells, activeInput, permanenceIncrement)
-    permanences.incrementNonZerosOnRowsExcludingCols(
-      activeCells, activeInput, -permanenceDecrement)
-    permanences.clipRowsBelowAndAbove(
-      activeCells, 0.0, 1.0)
-    if sampleSize == -1:
-      permanences.setZerosOnOuter(
-        activeCells, activeInput, initialPermanence)
-    else:
-      existingSynapseCounts = permanences.nNonZerosPerRowOnCols(
-        activeCells, activeInput)
-
-      maxNewByCell = np.empty(len(activeCells), dtype="int32")
-      np.subtract(sampleSize, existingSynapseCounts, out=maxNewByCell)
-
-      permanences.setRandomZerosOnOuter(
-        activeCells, growthCandidateInput, maxNewByCell, initialPermanence, rng)
-
+    return weights
 
 #
 # Functionality that could be added to the C code or bindings
 #
 
-def _sampleRange(rng, start, end, step, k):
-  """
-  Equivalent to:
+def _randomActivation(n, k):
+  # Activate k from n bits, randomly (by permutation)
+  activeCells = np.append(np.ones(k), np.zeros(n-k))
+  np.random.shuffle(activeCells)
+  return activeCells
 
-  random.sample(xrange(start, end, step), k)
-
-  except it uses our random number generator.
-
-  This wouldn't need to create the arange if it were implemented in C.
-  """
-  array = np.empty(k, dtype="uint32")
-  rng.sample(np.arange(start, end, step, dtype="uint32"), array)
-  return array
 
 
 def _sample(rng, arr, k):
