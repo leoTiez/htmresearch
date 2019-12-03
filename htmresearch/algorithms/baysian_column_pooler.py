@@ -19,9 +19,9 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import numpy
+import numpy as np
 
-from nupic.bindings.math import SparseMatrix, GetNTAReal, Random
+from nupic.bindings.math import SparseMatrix, Random
 
 
 
@@ -37,27 +37,32 @@ class ColumnPooler(object):
                lateralInputWidths=(),
                cellCount=4096,
                sdrSize=40,
-               onlineLearning = False,
+               # onlineLearning = False,
                maxSdrSize = None,
                minSdrSize = None,
 
                # Proximal
-               synPermProximalInc=0.1,
-               synPermProximalDec=0.001,
+               # synPermProximalInc=0.1,
+               # synPermProximalDec=0.001,
                initialProximalPermanence=0.6,
                sampleSizeProximal=20,
-               minThresholdProximal=10,
-               connectedPermanenceProximal=0.50,
-               predictedInhibitionThreshold=20,
+               # minThresholdProximal= 10,
+               # connectedPermanenceProximal=0.50,
+               # predictedInhibitionThreshold=20,
 
                # Distal
-               synPermDistalInc=0.1,
-               synPermDistalDec=0.001,
+               # synPermDistalInc=0.1,
+               # synPermDistalDec=0.001,
                initialDistalPermanence=0.6,
                sampleSizeDistal=20,
-               activationThresholdDistal=13,
-               connectedPermanenceDistal=0.50,
+               # activationThresholdDistal=13,
+               # connectedPermanenceDistal=0.50,
                inertiaFactor=1.,
+
+               # Baysian
+               noise=0.01,  # lambda
+               learningRate=0.1,  # alpha
+               activationThreshold=0.5, # probability such that a cell becomes active
 
                seed=42):
     """
@@ -152,7 +157,6 @@ class ColumnPooler(object):
     self.inputWidth = inputWidth
     self.cellCount = cellCount
     self.sdrSize = sdrSize
-    self.onlineLearning = onlineLearning
     if maxSdrSize is None:
       self.maxSdrSize = sdrSize
     else:
@@ -161,33 +165,45 @@ class ColumnPooler(object):
       self.minSdrSize = sdrSize
     else:
       self.minSdrSize = minSdrSize
-    self.synPermProximalInc = synPermProximalInc
-    self.synPermProximalDec = synPermProximalDec
     self.initialProximalPermanence = initialProximalPermanence
-    self.connectedPermanenceProximal = connectedPermanenceProximal
     self.sampleSizeProximal = sampleSizeProximal
-    self.minThresholdProximal = minThresholdProximal
-    self.predictedInhibitionThreshold = predictedInhibitionThreshold
-    self.synPermDistalInc = synPermDistalInc
-    self.synPermDistalDec = synPermDistalDec
     self.initialDistalPermanence = initialDistalPermanence
-    self.connectedPermanenceDistal = connectedPermanenceDistal
     self.sampleSizeDistal = sampleSizeDistal
-    self.activationThresholdDistal = activationThresholdDistal
     self.inertiaFactor = inertiaFactor
 
-    self.activeCells = numpy.empty(0, dtype="uint32")
+    self.activeCells = np.empty(0, dtype="float64")
     self._random = Random(seed)
+    self.useInertia=True
 
-    # These sparse matrices will hold the synapses for each segment.
+    # Baysian parameters (weights, bias, moving averages)
     # Each row represents one segment on a cell, so each cell potentially has
     # 1 proximal segment and 1+len(lateralInputWidths) distal segments.
-    self.proximalPermanences = SparseMatrix(cellCount, inputWidth)
-    self.internalDistalPermanences = SparseMatrix(cellCount, cellCount)
-    self.distalPermanences = tuple(SparseMatrix(cellCount, n)
-                                   for n in lateralInputWidths)
 
-    self.useInertia=True
+    # Weights 2D-Matrix - (1 segment per) cells x distalInput +1 (include bias)
+    # Needs to be split up, because each segment only connects to the specified input
+    self.distalWeights = tuple(np.zeros((self.cellCount, n+1))
+                               for n in lateralInputWidths)
+    self.internalDistalWeights = np.zeros((self.cellCount, self.cellCount+1))
+    self.proximalWeights = np.zeros((self.cellCount, self.inputWidth+1))
+
+    # Initialise weights to first segment randomly TODO check whether this is necessary. (commented out)
+    # TODO: Include bias in initialization, movingAverageInput ?
+    # for d in self.distalWeights:
+    #   d[:, :] = np.random.random(d[:, :].shape)
+    # self.internalDistalWeights[:, :] = np.random.random(self.internalDistalWeights[:, :].shape)
+    # self.proximalWeights[:, :] = np.random.random(self.proximalWeights[:, :].shape)
+
+    self.distalMovingAverages = tuple(np.zeros((self.cellCount, n+1)) for n in lateralInputWidths)
+    self.interalDistalMovingAverages = np.zeros(self.cellCount, self.cellCount+1)
+    self.proximalMovingAverages = np.zeros(self.cellCount, self.inputWidth+1)
+
+    self.distalMovingAverageInput = tuple(np.zeros(n) for n in lateralInputWidths)
+    self.distalMovingAverageInput = np.zeros(self.cellCount+1)
+    self.distalMovingAverageInput = np.zeros(self.inputWidth+1)
+
+    self.noise = noise
+    self.learningRate = learningRate
+    self.activationThreshold = activationThreshold
 
 
   def compute(self, feedforwardInput=(), lateralInputs=(),
@@ -222,31 +238,9 @@ class ColumnPooler(object):
       self._computeInferenceMode(feedforwardInput, lateralInputs)
 
     # learning step
-    elif not self.onlineLearning:
+    else:
       self._computeLearningMode(feedforwardInput, lateralInputs,
                                 feedforwardGrowthCandidates)
-    # online learning step
-    else:
-      if (predictedInput is not None and
-          len(predictedInput) > self.predictedInhibitionThreshold):
-        predictedActiveInput = numpy.intersect1d(feedforwardInput,
-                                                 predictedInput)
-        predictedGrowthCandidates = numpy.intersect1d(
-            feedforwardGrowthCandidates, predictedInput)
-        self._computeInferenceMode(predictedActiveInput, lateralInputs)
-        self._computeLearningMode(predictedActiveInput, lateralInputs,
-                                  feedforwardGrowthCandidates)
-      elif not self.minSdrSize <= len(self.activeCells) <= self.maxSdrSize:
-        # If the pooler doesn't have a single representation, try to infer one,
-        # before actually attempting to learn.
-        self._computeInferenceMode(feedforwardInput, lateralInputs)
-        self._computeLearningMode(feedforwardInput, lateralInputs,
-                                  feedforwardGrowthCandidates)
-      else:
-        # If there isn't predicted input and we have a single SDR,
-        # we are extending that representation and should just learn.
-        self._computeLearningMode(feedforwardInput, lateralInputs,
-                                  feedforwardGrowthCandidates)
 
 
   def _computeLearningMode(self, feedforwardInput, lateralInputs,
@@ -341,11 +335,11 @@ class ColumnPooler(object):
     # Calculate the feedforward supported cells
     overlaps = self.proximalPermanences.rightVecSumAtNZGteThresholdSparse(
       feedforwardInput, self.connectedPermanenceProximal)
-    feedforwardSupportedCells = numpy.where(
+    feedforwardSupportedCells = np.where(
       overlaps >= self.minThresholdProximal)[0]
 
     # Calculate the number of active segments on each cell
-    numActiveSegmentsByCell = numpy.zeros(self.cellCount, dtype="int")
+    numActiveSegmentsByCell = np.zeros(self.cellCount, dtype="int")
     overlaps = self.internalDistalPermanences.rightVecSumAtNZGteThresholdSparse(
       prevActiveCells, self.connectedPermanenceDistal)
     numActiveSegmentsByCell[overlaps >= self.activationThresholdDistal] += 1
@@ -367,23 +361,23 @@ class ColumnPooler(object):
       # This loop will select the FF-supported AND laterally-active cells, in
       # order of descending lateral activation, until we exceed the sdrSize
       # quorum - but will exclude cells with 0 lateral active segments.
-      ttop = numpy.max(numActiveSegsForFFSuppCells)
+      ttop = np.max(numActiveSegsForFFSuppCells)
       while ttop > 0 and len(chosenCells) < self.sdrSize:
-        chosenCells = numpy.union1d(chosenCells,
+        chosenCells = np.union1d(chosenCells,
                     feedforwardSupportedCells[numActiveSegsForFFSuppCells >= ttop])
         ttop -= 1
 
     # If we haven't filled the sdrSize quorum, add in inertial cells.
     if len(chosenCells) < self.sdrSize:
       if self.useInertia:
-        prevCells = numpy.setdiff1d(prevActiveCells, chosenCells)
+        prevCells = np.setdiff1d(prevActiveCells, chosenCells)
         inertialCap = int(len(prevCells) * self.inertiaFactor)
         if inertialCap > 0:
           numActiveSegsForPrevCells = numActiveSegmentsByCell[prevCells]
           # We sort the previously-active cells by number of active lateral
           # segments (this really helps).  We then activate them in order of
           # descending lateral activation.
-          sortIndices = numpy.argsort(numActiveSegsForPrevCells)[::-1]
+          sortIndices = np.argsort(numActiveSegsForPrevCells)[::-1]
           prevCells = prevCells[sortIndices]
           numActiveSegsForPrevCells = numActiveSegsForPrevCells[sortIndices]
 
@@ -394,9 +388,9 @@ class ColumnPooler(object):
 
           # Activate groups of previously active cells by order of their lateral
           # support until we either meet quota or run out of cells.
-          ttop = numpy.max(numActiveSegsForPrevCells)
+          ttop = np.max(numActiveSegsForPrevCells)
           while ttop >= 0 and len(chosenCells) < self.sdrSize:
-            chosenCells = numpy.union1d(chosenCells,
+            chosenCells = np.union1d(chosenCells,
                         prevCells[numActiveSegsForPrevCells >= ttop])
             ttop -= 1
 
@@ -404,7 +398,7 @@ class ColumnPooler(object):
     # support and no lateral support.
     discrepancy = self.sdrSize - len(chosenCells)
     if discrepancy > 0:
-      remFFcells = numpy.setdiff1d(feedforwardSupportedCells, chosenCells)
+      remFFcells = np.setdiff1d(feedforwardSupportedCells, chosenCells)
 
       # Inhibit cells proportionally to the number of cells that have already
       # been chosen. If ~0 have been chosen activate ~all of the feedforward
@@ -421,12 +415,12 @@ class ColumnPooler(object):
 
       if len(remFFcells) > n:
         selected = _sample(self._random, remFFcells, n)
-        chosenCells = numpy.append(chosenCells, selected)
+        chosenCells = np.append(chosenCells, selected)
       else:
-        chosenCells = numpy.append(chosenCells, remFFcells)
+        chosenCells = np.append(chosenCells, remFFcells)
 
     chosenCells.sort()
-    self.activeCells = numpy.asarray(chosenCells, dtype="uint32")
+    self.activeCells = np.asarray(chosenCells, dtype="uint32")
 
 
   def numberOfInputs(self):
@@ -465,7 +459,7 @@ class ColumnPooler(object):
       cells = xrange(self.numberOfCells())
 
     return _countWhereGreaterEqualInRows(self.proximalPermanences, cells,
-                                         self.connectedPermanenceProximal)
+                                         self. connectedPermanenceProximal)
 
 
   def numberOfProximalSynapses(self, cells=None):
@@ -560,7 +554,7 @@ class ColumnPooler(object):
     Reset internal states. When learning this signifies we are to learn a
     unique new object.
     """
-    self.activeCells = numpy.empty(0, dtype="uint32")
+    self.activeCells = np.empty(0, dtype="uint32")
 
   def getUseInertia(self):
     """
@@ -629,8 +623,8 @@ class ColumnPooler(object):
       existingSynapseCounts = permanences.nNonZerosPerRowOnCols(
         activeCells, activeInput)
 
-      maxNewByCell = numpy.empty(len(activeCells), dtype="int32")
-      numpy.subtract(sampleSize, existingSynapseCounts, out=maxNewByCell)
+      maxNewByCell = np.empty(len(activeCells), dtype="int32")
+      np.subtract(sampleSize, existingSynapseCounts, out=maxNewByCell)
 
       permanences.setRandomZerosOnOuter(
         activeCells, growthCandidateInput, maxNewByCell, initialPermanence, rng)
@@ -650,8 +644,8 @@ def _sampleRange(rng, start, end, step, k):
 
   This wouldn't need to create the arange if it were implemented in C.
   """
-  array = numpy.empty(k, dtype="uint32")
-  rng.sample(numpy.arange(start, end, step, dtype="uint32"), array)
+  array = np.empty(k, dtype="uint32")
+  rng.sample(np.arange(start, end, step, dtype="uint32"), array)
   return array
 
 
@@ -663,8 +657,8 @@ def _sample(rng, arr, k):
 
   except it uses our random number generator.
   """
-  selected = numpy.empty(k, dtype="uint32")
-  rng.sample(numpy.asarray(arr, dtype="uint32"),
+  selected = np.empty(k, dtype="uint32")
+  rng.sample(np.asarray(arr, dtype="uint32"),
              selected)
   return selected
 
