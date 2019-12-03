@@ -24,7 +24,7 @@
 import numpy as np
 
 from htmresearch.support import numpy_helpers as np2
-from nupic.bindings.math import Random, SparseMatrixConnections
+from nupic.bindings.math import Random
 
 
 class ApicalTiebreakBayesianTemporalMemory(object):
@@ -193,10 +193,6 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
     @param apicalInput (numpy array)
     List of active input bits for the apical dendrite segments
-
-    @param learn (bool)
-    Whether learning is enabled. Some TM implementations may depolarize cells
-    differently or do segment activity bookkeeping when learning is enabled.
     """
     activation_basal = self._calculateSegmentActivity(self.basalWeights, basalInput, self.basalBias, use_bias=True)
     activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.apicalBias, use_bias=False)
@@ -242,11 +238,11 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     all_columns = np.arange(0, self.numberOfColumns())
     # Get all inactive columns and set their respective predicted cells to zero
     inactive_columns = np.setdiff1d(all_columns, activeColumns)
-    active_cells_before_burst = self._reshapeCellsToColumnBased(self.predictedCells.copy())
-    active_cells_before_burst[:, inactive_columns] = 0
+    predicted_cells_before_burst = self._reshapeCellsToColumnBased(self.predictedCells.copy())
+    predicted_cells_before_burst[:, inactive_columns] = 0
     # find bursting columns
     bursting_columns = activeColumns[np.where(
-      np.abs(active_cells_before_burst[:, activeColumns].sum(axis=0)
+      np.abs(predicted_cells_before_burst[:, activeColumns].sum(axis=0)
              ) < self.minThreshold)]  # Use this because of numerical issues. Sum over all cells should be zero
                                       # If there is one active cell, the sum over all cells >= thresold
                                       # TODO consider change if normalisation is changed
@@ -323,7 +319,9 @@ class ApicalTiebreakBayesianTemporalMemory(object):
       )
 
   def _calculatePredictedValues(self, activation_basal, activation_apical):
+    # TODO: We can not interpret it as probability anymore when adding apical+basal activation
     predicted_cells = self._calculatePredictedCells(activation_basal, activation_apical)
+    # TODO: Update status report to normalize before activation
     normalisation = self._reshapeCellsToColumnBased(predicted_cells).sum(axis=0)
     predicted_cells = self._reshapeCellsFromColumnBased(
       self._reshapeCellsToColumnBased(predicted_cells)
@@ -421,6 +419,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     if learningRate is None:
       learningRate = self.learningRate
 
+      # TODO: Should this be included in the if statement?
       numSegments = self.numApicalSegments if isApical else self.numBasalSegments
 
     # Updating moving average weights to input
