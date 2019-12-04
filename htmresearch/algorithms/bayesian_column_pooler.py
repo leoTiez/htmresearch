@@ -315,8 +315,6 @@ class BayesianColumnPooler(object):
       temporalLearningRate,
     )
 
-
-
     # Learning
     # If we have a union of cells active, don't learn.  This primarily affects
     # online learning.

@@ -393,6 +393,7 @@ class L4L2Experiment(object):
 
     for objectName, sensationList in objects.iteritems():
 
+      print("learn", objectName, )
       # ignore empty sensation lists
       if len(sensationList) == 0:
         continue
