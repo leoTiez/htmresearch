@@ -32,7 +32,7 @@ class BayesianCPTest(unittest.TestCase):
         self.proximalInputValue = 0.2
 
         # Reduce network size
-        self.bcp = bcp.ColumnPooler(
+        self.bcp = bcp.BayesianColumnPooler(
             inputWidth=self.inputWidth,
             lateralInputWidths=self.lateralInputWidths,
             cellCount=self.cellCount,
@@ -53,7 +53,7 @@ class BayesianCPTest(unittest.TestCase):
         lateralInputWidths = [lateralInputWidth, lateralInputWidth]
         lateralInputValue = 0.2
 
-        cp = bcp.ColumnPooler(
+        cp = bcp.BayesianColumnPooler(
             inputWidth=inputWidth,
             lateralInputWidths=lateralInputWidths,
             cellCount=cellCount,
@@ -104,7 +104,7 @@ class BayesianCPTest(unittest.TestCase):
         lateralInputWidths = [lateralInputWidth, lateralInputWidth]
         lateralInputValue = 0.2
 
-        cp = bcp.ColumnPooler(
+        cp = bcp.BayesianColumnPooler(
             inputWidth=inputWidth,
             lateralInputWidths=lateralInputWidths,
             cellCount=cellCount,
@@ -170,7 +170,7 @@ class BayesianCPTest(unittest.TestCase):
         lateralInputWidths = [lateralInputWidth]
         lateralInputValue = 0.2
 
-        cp = bcp.ColumnPooler(
+        cp = bcp.BayesianColumnPooler(
             inputWidth=self.inputWidth,
             lateralInputWidths=lateralInputWidths,
             cellCount=self.cellCount,

@@ -232,11 +232,6 @@ class BayesianColumnPooler(object):
       self._computeLearningMode(feedforwardInput, lateralInputs,
                                 feedforwardGrowthCandidates)
 
-    print("Bayesian column pooler inputs")
-    print(feedforwardInput.nonzero())
-    print("Baysian column pooler outputs")
-    print(self.getActiveCellsIndices())
-
 
   # TODO: Here and in bayesian-apical-TM: Sampling the connections we learn on? (e.g. with growth candidates)
   # Currently all weights are changed
@@ -364,7 +359,7 @@ class BayesianColumnPooler(object):
 
     # Calculate the feedforward supported cells
     input = np.append(feedforwardInput, 1) # include bias term
-    feedForwardActivation = np.multiply(self.proximalWeights, input).sum(axis=1)
+    feedForwardActivation = np.exp(np.multiply(self.proximalWeights, input).sum(axis=1))
     feedforwardSupportedCells = np.where(feedForwardActivation >= self.activationThreshold)[0]
 
     # Calculate the number of active distal segments (internal and lateral) on each cell
@@ -372,13 +367,13 @@ class BayesianColumnPooler(object):
 
     # Internal Distal
     prevActiveCellsVector = np.append(prevActiveCells, 1) # include bias term
-    internalDistalActivation = np.multiply(self.internalDistalWeights, prevActiveCellsVector).sum(axis=1)
+    internalDistalActivation = np.exp(np.multiply(self.internalDistalWeights, prevActiveCellsVector).sum(axis=1))
     numActiveSegmentsByCell[internalDistalActivation >= self.activationThreshold] += 1
 
     # Lateral connections to other cortical columns
     for i, lateralInput in enumerate(lateralInputs):
       lateralInputVector = np.append(lateralInput, 1)
-      distalActivation = np.multiply(self.distalWeights[i], lateralInputVector).sum(axis=1)
+      distalActivation = np.exp(np.multiply(self.distalWeights[i], lateralInputVector).sum(axis=1))
       numActiveSegmentsByCell[distalActivation >= self.activationThreshold] += 1
 
     chosenCells = np.array([], dtype="int")
