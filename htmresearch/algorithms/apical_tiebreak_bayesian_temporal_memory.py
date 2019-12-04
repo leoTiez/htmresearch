@@ -112,6 +112,10 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     self.maxSegmentsPerCell = maxSegmentsPerCell
     self.basalInputSize = basalInputSize
     self.apicalInputSize = apicalInputSize
+    self.noise = noise
+    self.learningRate = learningRate
+
+    self.rng = Random(seed)
 
     self.numBasalSegments = 1
     self.numApicalSegments = 1
@@ -138,10 +142,10 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     self.basalMovingAverageInput = np.zeros(self.basalInputSize)
     self.apicalMovingAverageInput = np.zeros(self.apicalInputSize)
 
-    self.noise = noise
-    self.learningRate = learningRate
+    # Set to zero to use randomly initialized first weight value
+    self.basalSegmentCount = np.zeros((self.columnCount, self.cellsPerColumn))
+    self.apicalSegmentCount = np.zeros((self.columnCount, self.cellsPerColumn))
 
-    self.rng = Random(seed)
     # Changed already to float64
     self.predictedCells = np.zeros(self.numberOfCells(), dtype="float64")
     self.activeBasalSegments = np.zeros((self.maxSegmentsPerCell, self.numberOfCells()), dtype="float64")
@@ -253,23 +257,30 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
     # Calculate basal segment activity after bursting
     if bursting_columns.shape[0] > 0:
-      (self.basalWeights,
-       self.basalMovingAverages,
-       self.basalBias,
-       self.basalMovingAveragesBias,
-       self.activeBasalSegments,
-       self.numBasalSegments) = self._addNewSegments(isApical=False)
-      (self.apicalWeights,
-       self.apicalMovingAverages,
-       self.apicalBias,
-       self.apicalMovingAveragesBias,
-       self.activeApicalSegments,
-       self.numApicalSegments) = self._addNewSegments(isApical=True)
+      if np.any(self.numBasalSegments == np.min(self.basalSegmentCount[activeColumns, :], axis=1)):
+        (self.basalWeights,
+         self.basalMovingAverages,
+         self.basalBias,
+         self.basalMovingAveragesBias,
+         self.activeBasalSegments,
+         self.numBasalSegments) = self._addNewSegments(isApical=False)
+      if np.any(self.numApicalSegments == np.min(self.apicalSegmentCount[activeColumns, :], axis=1)):
+        (self.apicalWeights,
+         self.apicalMovingAverages,
+         self.apicalBias,
+         self.apicalMovingAveragesBias,
+         self.activeApicalSegments,
+         self.numApicalSegments) = self._addNewSegments(isApical=True)
 
-      self.activeBasalSegments = self._setMaxSegmentsAfterBursting(bursting_columns, self.activeBasalSegments)
-      self.activeApicalSegments = self._setMaxSegmentsAfterBursting(
+      self.activeBasalSegments, self.basalSegmentCount = self._setMaxSegmentsAfterBursting(
+        bursting_columns,
+        self.activeBasalSegments,
+        self.basalSegmentCount
+      )
+      self.activeApicalSegments, self.apicalSegmentCount = self._setMaxSegmentsAfterBursting(
         bursting_columns,
         self.activeApicalSegments,
+        self.apicalSegmentCount,
         isApical=True
       )
       # Sets bursting cells to 1 due to normalisation in the column
@@ -343,8 +354,9 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     active_segments = self.activeApicalSegments if isApical else self.activeBasalSegments
     numSegments = self.numApicalSegments if isApical else self.numBasalSegments
 
-    if numSegments < self.maxSegmentsPerCell:
-      weight_matrix = np.append(weight_matrix, np.zeros((1, self.numberOfCells(), input_size)), axis=0)
+    if numSegments + 1 < self.maxSegmentsPerCell:
+      # TODO Check whether random or zeros is better
+      weight_matrix = np.append(weight_matrix, np.random.random((1, self.numberOfCells(), input_size)), axis=0)
       average_matrix = np.append(average_matrix, np.zeros((1, self.numberOfCells(), input_size)), axis=0)
       bias_matrix = np.append(bias_matrix, np.zeros((1, self.numberOfCells())), axis=0)
       bias_average = np.append(bias_average, np.zeros((1, self.numberOfCells())), axis=0)
@@ -353,20 +365,32 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
     return weight_matrix, average_matrix, bias_matrix, bias_average, active_segments, numSegments
 
-  def _setMaxSegmentsAfterBursting(self, burstingColumns, segments, isApical=False):
+  def _setMaxSegmentsAfterBursting(self, burstingColumns, segments, segmentCount, isApical=False):
     # Calculate bursting columns
     # This makes sure that only segments are learnt that are active
     # Reshaping active segments for easy access per column
     segments_column_based = self._reshapeSegmentsToColumnBased(segments)
     # TODO check update of values
-    max_cells_ind = self._getMaxCellIndexPerColumn(segments_column_based[:, :, burstingColumns], self.cellsPerColumn)
-    segments_to_update = segments_column_based[:, max_cells_ind, burstingColumns].argmin(axis=0)
-    segments_column_based[segments_to_update, max_cells_ind, burstingColumns] = self.minThreshold
-    return self._reshapeSegmetsFromColumnBased(segments_column_based, isApical=isApical)
+    min_segment_cells_ind = self._getCellWithMinSegments(segmentCount[burstingColumns, :])
+    segments_column_based[
+      segmentCount[burstingColumns, min_segment_cells_ind].astype('int32'),
+      min_segment_cells_ind,
+      burstingColumns
+    ] = self.minThreshold
+    update_ind = segmentCount[
+      burstingColumns,
+      min_segment_cells_ind
+    ][segmentCount[burstingColumns, min_segment_cells_ind] < self.maxSegmentsPerCell].astype('int32')
+    segmentCount[burstingColumns, min_segment_cells_ind][update_ind] += 1
+    return self._reshapeSegmetsFromColumnBased(segments_column_based, isApical=isApical), segmentCount
 
   @staticmethod
   def _getMaxCellIndexPerColumn(segmentMatrix, cellsPerColumn):
     return np.row_stack(segmentMatrix).argmax(axis=0) % cellsPerColumn
+
+  @staticmethod
+  def _getCellWithMinSegments(segmentCount):
+    return np.argmin(segmentCount, axis=1)
 
   def _setNonActiveSegments(self, segments, inactiveColumns, isApical=False):
     segments[segments < self.minThreshold] = 0.0
