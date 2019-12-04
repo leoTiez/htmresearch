@@ -42,7 +42,130 @@ class BayesianCPTest(unittest.TestCase):
             activationThreshold=self.activationThreshold,
         )
 
-    def test_compute_proximal_lateral(self):
+    # runs multiple learning iterations, but always with the same pattern # TODO: Make meaningful by changing input
+    def test_compute_proximal_lateral_multiple_iterations(self):
+        learning_times = 5
+        inference_times = 1
+        cellCount = 20
+        sdrSize = 4
+        lateralInputWidth = 10
+        inputWidth = 10
+        lateralInputWidths = [lateralInputWidth, lateralInputWidth]
+        lateralInputValue = 0.2
+
+        cp = bcp.ColumnPooler(
+            inputWidth=inputWidth,
+            lateralInputWidths=lateralInputWidths,
+            cellCount=cellCount,
+            sdrSize=sdrSize,
+            noise=self.noise,
+            learningRate=self.learningRate,
+            activationThreshold=self.activationThreshold,
+        )
+
+        proximalInput = np.full(inputWidth, self.proximalInputValue)
+        lateralInput = np.full(lateralInputWidth, lateralInputValue)
+        lateralInputValues = [lateralInput, lateralInput]
+
+        # Multiple step learn
+        for i in range(0, learning_times):
+            cp.compute(
+                feedforwardInput=proximalInput,
+                lateralInputs=lateralInputValues,
+                learn=True,
+            )
+        activationLearn = cp.getActiveCells()
+
+        # Multiple step inference
+        for i in range(0, inference_times):
+            cp.compute(
+                feedforwardInput=proximalInput,
+                lateralInputs=lateralInputValues,
+            )
+            activationInference = cp.getActiveCells()
+
+            print("Two activations", activationLearn, activationInference)
+
+            self.assertTrue(len(activationLearn) == sdrSize,
+                            "New object-representation was not correctly initialized with sdrSize active bits.")
+
+            self.assertTrue(len(activationInference) == sdrSize,
+                            "New activation was not correctly initialized with sdrSize active bits during inference.")
+
+            self.assertTrue(np.array_equal(np.sort(activationLearn), np.sort(activationInference)),
+                            "After one step the activation should be similar to the learned activation. (same input)")
+
+
+    def test_compute_inference_proximal_lateral(self):
+        cellCount = 20
+        sdrSize = 4
+        lateralInputWidth = 10
+        inputWidth = 10
+        lateralInputWidths = [lateralInputWidth, lateralInputWidth]
+        lateralInputValue = 0.2
+
+        cp = bcp.ColumnPooler(
+            inputWidth=inputWidth,
+            lateralInputWidths=lateralInputWidths,
+            cellCount=cellCount,
+            sdrSize=sdrSize,
+            noise=self.noise,
+            learningRate=self.learningRate,
+            activationThreshold=self.activationThreshold,
+        )
+
+        proximalInput = np.full(inputWidth, self.proximalInputValue)
+        lateralInput = np.full(lateralInputWidth, lateralInputValue)
+        lateralInputValues = [lateralInput, lateralInput]
+
+        # One step learn
+        cp.compute(
+            feedforwardInput=proximalInput,
+            lateralInputs=lateralInputValues,
+            learn=True,
+        )
+        activationLearn = cp.getActiveCells()
+
+        # One step inference
+        cp.compute(
+            feedforwardInput=proximalInput,
+            lateralInputs=lateralInputValues,
+        )
+        activationInference = cp.getActiveCells()
+
+        print("Two activations", activationLearn, activationInference)
+
+        self.assertTrue(len(activationLearn) == sdrSize,
+                        "New object-representation was not correctly initialized with sdrSize active bits.")
+
+        self.assertTrue(len(activationInference) == sdrSize,
+                        "New activation was not correctly initialized with sdrSize active bits during inference.")
+
+        self.assertTrue(np.array_equal(np.sort(activationLearn), np.sort(activationInference)),
+                        "After one step the activation should be similar to the learned activation. (same input)")
+
+
+    def test_compute_inference_proximal_only(self):
+        proximalInput = np.full(self.inputWidth, self.proximalInputValue)
+
+        # One step learn
+        self.bcp.compute(feedforwardInput=proximalInput, learn=True)
+        activationLearn = self.bcp.getActiveCells()
+        # One step inference
+        self.bcp._computeInferenceMode(feedforwardInput=proximalInput, lateralInputs=[])
+        activationInference = self.bcp.getActiveCells()
+
+        self.assertTrue(len(activationLearn) == self.sdrSize,
+                        "New object-representation was not correctly initialized with sdrSize active bits.")
+
+        self.assertTrue(len(activationInference) == self.sdrSize,
+                        "New activation was not correctly initialized with sdrSize active bits during inference.")
+
+        self.assertTrue(np.array_equal(np.sort(activationLearn), np.sort(activationInference)),
+                        "After one step the activation should be similar to the learned activation. (same input)")
+
+
+    def test_compute_learn_proximal_lateral(self):
         lateralInputWidth = 6
         lateralInputWidths = [lateralInputWidth]
         lateralInputValue = 0.2
@@ -69,9 +192,9 @@ class BayesianCPTest(unittest.TestCase):
 
         activeCellIndicies = cp.getActiveCells()
         self.assertTrue(len(activeCellIndicies) == self.sdrSize,
-                        "New object-representation was not corretly initialized with sdrSize active bits.")
+                        "New object-representation was not correctly initialized with sdrSize active bits.")
 
-    def test_compute_proximal_only(self):
+    def test_compute_learn_proximal_only(self):
         proximalInput = np.full(self.inputWidth, self.proximalInputValue)
 
         self.bcp.compute(
@@ -81,7 +204,7 @@ class BayesianCPTest(unittest.TestCase):
 
         activeCellIndicies = self.bcp.getActiveCells()
         self.assertTrue(len(activeCellIndicies) == self.sdrSize,
-                        "New object-representation was not corretly initialized with sdrSize active bits.")
+                        "New object-representation was not correctly initialized with sdrSize active bits.")
 
     def test_moving_average(self):
         # Object representation example (randomly sampled)

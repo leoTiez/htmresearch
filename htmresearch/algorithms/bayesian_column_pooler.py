@@ -285,7 +285,7 @@ class ColumnPooler(object):
     # enforce the active cells in the output layer
     if self.numberOfActiveCells() < self.minSdrSize:
       # Randomly activate sdrSize bits from an array with cellCount bits
-      self.activeCells = _randomActivation(self.cellCount, self.sdrSize)
+      self.activeCells = _randomActivation(self.cellCount, self.sdrSize, self._random)
 
     # Update moving averages -> could be extended to be updated in inference mode too
     self.proximalMovingAverages, \
@@ -365,60 +365,49 @@ class ColumnPooler(object):
     """
 
     prevActiveCells = self.activeCells
-
-    # # Calculate the feedforward supported cells
-    # input = np.append(feedforwardInput, 1) # include bias term
-    # feedForwardActivation = np.multiply(self.proximalWeights, input).sum(axis=1)
-    #
-    # # Calculate the number of lateral support on each cell
-    # internalDistalActivation = np.multiply(self.internalDistalWeights, prevActiveCells).sum(axis=1)
-    # lateralSupport = internalDistalActivation
-    # for i, lateralInput in enumerate(lateralInputs):
-    #   distalActivation = np.multiply(self.distalWeights[i], lateralInput).sum(axis=1)
-    #   lateralSupport *= distalActivation  # TODO: SUM, MULTIPLY OR AVG?
-    #
-    #
-    # support = feedForwardActivation * lateralSupport
+    prevActiveCellIndicies = np.where(prevActiveCells >= self.activationThreshold)[0]
 
     # Calculate the feedforward supported cells
-    overlaps = self.proximalPermanences.rightVecSumAtNZGteThresholdSparse(
-      feedforwardInput, self.connectedPermanenceProximal)
-    feedforwardSupportedCells = np.where(
-      overlaps >= self.minThresholdProximal)[0]
+    input = np.append(feedforwardInput, 1) # include bias term
+    feedForwardActivation = np.multiply(self.proximalWeights, input).sum(axis=1)
+    feedforwardSupportedCells = np.where(feedForwardActivation >= self.activationThreshold)[0]
 
-    # Calculate the number of active segments on each cell
+    # Calculate the number of active distal segments (internal and lateral) on each cell
     numActiveSegmentsByCell = np.zeros(self.cellCount, dtype="int")
-    overlaps = self.internalDistalPermanences.rightVecSumAtNZGteThresholdSparse(
-      prevActiveCells, self.connectedPermanenceDistal)
-    numActiveSegmentsByCell[overlaps >= self.activationThresholdDistal] += 1
-    for i, lateralInput in enumerate(lateralInputs):
-      overlaps = self.distalPermanences[i].rightVecSumAtNZGteThresholdSparse(
-        lateralInput, self.connectedPermanenceDistal)
-      numActiveSegmentsByCell[overlaps >= self.activationThresholdDistal] += 1
 
-    chosenCells = []
+    # Internal Distal
+    prevActiveCellsVector = np.append(prevActiveCells, 1) # include bias term
+    internalDistalActivation = np.multiply(self.internalDistalWeights, prevActiveCellsVector).sum(axis=1)
+    numActiveSegmentsByCell[internalDistalActivation >= self.activationThreshold] += 1
+
+    # Lateral connections to other cortical columns
+    for i, lateralInput in enumerate(lateralInputs):
+      lateralInputVector = np.append(lateralInput, 1)
+      distalActivation = np.multiply(self.distalWeights[i], lateralInputVector).sum(axis=1)
+      numActiveSegmentsByCell[distalActivation >= self.activationThreshold] += 1
+
+    chosenCells = np.array([], dtype="int")
 
     # First, activate the FF-supported cells that have the highest number of
     # lateral active segments (as long as it's not 0)
     if len(feedforwardSupportedCells) == 0:
       pass
     else:
-      numActiveSegsForFFSuppCells = numActiveSegmentsByCell[
-        feedforwardSupportedCells]
+      numActiveSegsForFFSuppCells = numActiveSegmentsByCell[feedforwardSupportedCells]
 
       # This loop will select the FF-supported AND laterally-active cells, in
       # order of descending lateral activation, until we exceed the sdrSize
       # quorum - but will exclude cells with 0 lateral active segments.
       ttop = np.max(numActiveSegsForFFSuppCells)
       while ttop > 0 and len(chosenCells) < self.sdrSize:
-        chosenCells = np.union1d(chosenCells,
-                    feedforwardSupportedCells[numActiveSegsForFFSuppCells >= ttop])
+        supported = feedforwardSupportedCells[numActiveSegsForFFSuppCells >= ttop]
+        chosenCells = np.union1d(chosenCells, supported)
         ttop -= 1
 
     # If we haven't filled the sdrSize quorum, add in inertial cells.
     if len(chosenCells) < self.sdrSize:
       if self.useInertia:
-        prevCells = np.setdiff1d(prevActiveCells, chosenCells)
+        prevCells = np.setdiff1d(prevActiveCellIndicies, chosenCells)
         inertialCap = int(len(prevCells) * self.inertiaFactor)
         if inertialCap > 0:
           numActiveSegsForPrevCells = numActiveSegmentsByCell[prevCells]
@@ -438,8 +427,7 @@ class ColumnPooler(object):
           # support until we either meet quota or run out of cells.
           ttop = np.max(numActiveSegsForPrevCells)
           while ttop >= 0 and len(chosenCells) < self.sdrSize:
-            chosenCells = np.union1d(chosenCells,
-                        prevCells[numActiveSegsForPrevCells >= ttop])
+            chosenCells = np.union1d(chosenCells, prevCells[numActiveSegsForPrevCells >= ttop])
             ttop -= 1
 
     # If we haven't filled the sdrSize quorum, add cells that have feedforward
@@ -468,7 +456,9 @@ class ColumnPooler(object):
         chosenCells = np.append(chosenCells, remFFcells)
 
     chosenCells.sort()
-    self.activeCells = np.asarray(chosenCells, dtype="uint32")
+    self.activeCells = np.zeros(self.cellCount, dtype="float64")
+    # TODO: Inference mode only sets them to 1, but we could calculate a value from the proximal/distal support
+    self.activeCells[chosenCells] = 1 # feedForwardActivation[chosenCells] + distal/lateral mult/sum?
 
 
   def numberOfInputs(self):
@@ -688,13 +678,26 @@ class ColumnPooler(object):
 # Functionality that could be added to the C code or bindings
 #
 
-def _randomActivation(n, k):
-  # Activate k from n bits, randomly (by permutation)
-  activeCells = np.append(np.ones(k), np.zeros(n-k))
-  np.random.shuffle(activeCells)
+def _randomActivation(n, k, randomizer):
+  # Activate k from n bits, randomly (using custom randomizer for reproducibility)
+  activeCells = np.zeros(n, dtype="float64")
+  indicies = _sampleRange(randomizer, 0, n, step=1, k=k)
+  activeCells[indicies] = 1
   return activeCells
 
+def _sampleRange(rng, start, end, step, k):
+  """
+  Equivalent to:
 
+  random.sample(xrange(start, end, step), k)
+
+  except it uses our random number generator.
+
+  This wouldn't need to create the arange if it were implemented in C.
+  """
+  array = np.empty(k, dtype="uint32")
+  rng.sample(np.arange(start, end, step, dtype="uint32"), array)
+  return array
 
 def _sample(rng, arr, k):
   """
