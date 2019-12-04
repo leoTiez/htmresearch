@@ -190,8 +190,8 @@ class BayesianCPTest(unittest.TestCase):
             learn=True,
         )
 
-        activeCellIndicies = cp.getActiveCells()
-        self.assertTrue(len(activeCellIndicies) == self.sdrSize,
+        activeCellIndices = cp.getActiveCells()
+        self.assertTrue(len(activeCellIndices) == self.sdrSize,
                         "New object-representation was not correctly initialized with sdrSize active bits.")
 
     def test_compute_learn_proximal_only(self):
@@ -202,8 +202,8 @@ class BayesianCPTest(unittest.TestCase):
             learn=True,
         )
 
-        activeCellIndicies = self.bcp.getActiveCells()
-        self.assertTrue(len(activeCellIndicies) == self.sdrSize,
+        activeCellIndices = self.bcp.getActiveCells()
+        self.assertTrue(len(activeCellIndices) == self.sdrSize,
                         "New object-representation was not correctly initialized with sdrSize active bits.")
 
     def test_moving_average(self):

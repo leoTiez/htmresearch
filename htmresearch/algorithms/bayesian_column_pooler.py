@@ -25,7 +25,7 @@ from nupic.bindings.math import Random
 
 
 
-class ColumnPooler(object):
+class BayesianColumnPooler(object):
   """
   This class constitutes a temporary implementation for a cross-column pooler.
   The implementation goal of this class is to prove basic properties before
@@ -37,26 +37,14 @@ class ColumnPooler(object):
                lateralInputWidths=(),
                cellCount=4096,
                sdrSize=40,
-               # onlineLearning = False,
                maxSdrSize = None,
                minSdrSize = None,
 
                # Proximal
-               # synPermProximalInc=0.1,
-               # synPermProximalDec=0.001,
-               # initialProximalPermanence=0.6,
                sampleSizeProximal=20,
-               # minThresholdProximal= 10,
-               # connectedPermanenceProximal=0.50,
-               # predictedInhibitionThreshold=20,
 
                # Distal
-               # synPermDistalInc=0.1,
-               # synPermDistalDec=0.001,
-               # initialDistalPermanence=0.6,
                sampleSizeDistal=20,
-               # activationThresholdDistal=13,
-               # connectedPermanenceDistal=0.50,
                inertiaFactor=1.,
 
                # Bayesian
@@ -244,7 +232,14 @@ class ColumnPooler(object):
       self._computeLearningMode(feedforwardInput, lateralInputs,
                                 feedforwardGrowthCandidates)
 
+    print("Bayesian column pooler inputs")
+    print(feedforwardInput.nonzero())
+    print("Baysian column pooler outputs")
+    print(self.getActiveCellsIndices())
 
+
+  # TODO: Here and in bayesian-apical-TM: Sampling the connections we learn on? (e.g. with growth candidates)
+  # Currently all weights are changed
   def _computeLearningMode(self,
                            feedforwardInput,
                            lateralInputs,
@@ -365,7 +360,7 @@ class ColumnPooler(object):
     """
 
     prevActiveCells = self.activeCells
-    prevActiveCellIndicies = np.where(prevActiveCells >= self.activationThreshold)[0]
+    prevActiveCellIndices = np.where(prevActiveCells >= self.activationThreshold)[0]
 
     # Calculate the feedforward supported cells
     input = np.append(feedforwardInput, 1) # include bias term
@@ -407,7 +402,7 @@ class ColumnPooler(object):
     # If we haven't filled the sdrSize quorum, add in inertial cells.
     if len(chosenCells) < self.sdrSize:
       if self.useInertia:
-        prevCells = np.setdiff1d(prevActiveCellIndicies, chosenCells)
+        prevCells = np.setdiff1d(prevActiveCellIndices, chosenCells)
         inertialCap = int(len(prevCells) * self.inertiaFactor)
         if inertialCap > 0:
           numActiveSegsForPrevCells = numActiveSegmentsByCell[prevCells]
@@ -482,115 +477,15 @@ class ColumnPooler(object):
     # np.where returns tuple for all dimensions -> return array of fist dimension
     return np.where(self.activeCells >= self.activationThreshold)[0]
 
+  def getActiveCellValues(self):
+    return self.activeCells
+
   def getActiveCells(self):
     """
     Returns the indices of the active cells.
     @return (list) Indices of active cells.
     """
     return self.getActiveCellsIndices()
-
-  def numberOfConnectedProximalSynapses(self, cells=None):
-    """
-    Returns the number of proximal connected synapses on these cells.
-
-    Parameters:
-    ----------------------------
-    @param  cells (iterable)
-            Indices of the cells. If None return count for all cells.
-    """
-    if cells is None:
-      cells = xrange(self.numberOfCells())
-
-    return _countWhereGreaterEqualInRows(self.proximalPermanences, cells,
-                                         self. connectedPermanenceProximal)
-
-
-  def numberOfProximalSynapses(self, cells=None):
-    """
-    Returns the number of proximal synapses with permanence>0 on these cells.
-
-    Parameters:
-    ----------------------------
-    @param  cells (iterable)
-            Indices of the cells. If None return count for all cells.
-    """
-    if cells is None:
-      cells = xrange(self.numberOfCells())
-
-    n = 0
-    for cell in cells:
-      n += self.proximalPermanences.nNonZerosOnRow(cell)
-    return n
-
-
-  def numberOfDistalSegments(self, cells=None):
-    """
-    Returns the total number of distal segments for these cells.
-
-    A segment "exists" if its row in the matrix has any permanence values > 0.
-
-    Parameters:
-    ----------------------------
-    @param  cells (iterable)
-            Indices of the cells
-    """
-    if cells is None:
-      cells = xrange(self.numberOfCells())
-
-    n = 0
-
-    for cell in cells:
-      if self.internalDistalPermanences.nNonZerosOnRow(cell) > 0:
-        n += 1
-
-      for permanences in self.distalPermanences:
-        if permanences.nNonZerosOnRow(cell) > 0:
-          n += 1
-
-    return n
-
-
-  def numberOfConnectedDistalSynapses(self, cells=None):
-    """
-    Returns the number of connected distal synapses on these cells.
-
-    Parameters:
-    ----------------------------
-    @param  cells (iterable)
-            Indices of the cells. If None return count for all cells.
-    """
-    if cells is None:
-      cells = xrange(self.numberOfCells())
-
-    n = _countWhereGreaterEqualInRows(self.internalDistalPermanences, cells,
-                                      self.connectedPermanenceDistal)
-
-    for permanences in self.distalPermanences:
-      n += _countWhereGreaterEqualInRows(permanences, cells,
-                                         self.connectedPermanenceDistal)
-
-    return n
-
-
-  def numberOfDistalSynapses(self, cells=None):
-    """
-    Returns the total number of distal synapses for these cells.
-
-    Parameters:
-    ----------------------------
-    @param  cells (iterable)
-            Indices of the cells
-    """
-    if cells is None:
-      cells = xrange(self.numberOfCells())
-    n = 0
-    for cell in cells:
-      n += self.internalDistalPermanences.nNonZerosOnRow(cell)
-
-      for permanences in self.distalPermanences:
-        n += permanences.nNonZerosOnRow(cell)
-    return n
-
 
   def reset(self):
     """
@@ -681,8 +576,8 @@ class ColumnPooler(object):
 def _randomActivation(n, k, randomizer):
   # Activate k from n bits, randomly (using custom randomizer for reproducibility)
   activeCells = np.zeros(n, dtype="float64")
-  indicies = _sampleRange(randomizer, 0, n, step=1, k=k)
-  activeCells[indicies] = 1
+  indices = _sampleRange(randomizer, 0, n, step=1, k=k)
+  activeCells[indices] = 1
   return activeCells
 
 def _sampleRange(rng, start, end, step, k):
@@ -711,14 +606,3 @@ def _sample(rng, arr, k):
   rng.sample(np.asarray(arr, dtype="uint32"),
              selected)
   return selected
-
-
-def _countWhereGreaterEqualInRows(sparseMatrix, rows, threshold):
-  """
-  Like countWhereGreaterOrEqual, but for an arbitrary selection of rows, and
-  without any column filtering.
-  """
-  return sum(sparseMatrix.countWhereGreaterOrEqual(row, row+1,
-                                                   0, sparseMatrix.nCols(),
-                                                   threshold)
-             for row in rows)
