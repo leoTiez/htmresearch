@@ -166,11 +166,15 @@ class BayesianColumnPooler(object):
     # Each row represents one segment on a cell, so each cell potentially has
     # 1 proximal segment and 1+len(lateralInputWidths) distal segments.
 
-    # Weights 2D-Matrix - (1 segment per) cells x distalInput +1 (include bias)
+    # Weights 2D-Matrix - (1 segment per) cells x distalInput
     # Needs to be split up, because each segment only connects to the specified input
-    self.distalWeights = list(np.zeros((self.cellCount, n+1)) for n in lateralInputWidths)
-    self.internalDistalWeights = np.zeros((self.cellCount, self.cellCount+1))
-    self.proximalWeights = np.zeros((self.cellCount, self.inputWidth+1))
+    self.distalWeights = list(np.zeros((self.cellCount, n)) for n in lateralInputWidths)
+    self.internalDistalWeights = np.zeros((self.cellCount, self.cellCount))
+    self.proximalWeights = np.zeros((self.cellCount, self.inputWidth))
+
+    self.distalBias = list(np.zeros(self.cellCount) for n in lateralInputWidths)
+    self.internalDistalBias = np.zeros(self.cellCount)
+    self.proximalBias = np.zeros(self.cellCount)
 
     # Initialise weights to first segment randomly TODO check whether this is necessary. (commented out)
     # for d in self.distalWeights:
@@ -182,7 +186,6 @@ class BayesianColumnPooler(object):
     self.internalDistalMovingAverages = np.zeros((self.cellCount, self.cellCount))
     self.proximalMovingAverages = np.zeros((self.cellCount, self.inputWidth))
 
-    # TODO: Separate bias per cell context needed?
     self.distalMovingAverageBias = list(np.zeros(self.cellCount) for n in lateralInputWidths)
     self.internalDistalMovingAverageBias = np.zeros(self.cellCount)
     self.proximalMovingAverageBias = np.zeros(self.cellCount)
@@ -324,14 +327,17 @@ class BayesianColumnPooler(object):
     # Finally, now that we have decided which cells we should be learning on, do
     # the actual learning.
     if len(feedforwardInput) > 0:
-      self.proximalWeights = self._learn(self.proximalMovingAverages, self.proximalMovingAverageBias, self.proximalMovingAverageInput)
+      self.proximalWeights, \
+      self.proximalBias = self._learn(self.proximalMovingAverages, self.proximalMovingAverageBias, self.proximalMovingAverageInput)
 
       # External distal learning
       for i, lateralInput in enumerate(lateralInputs):
-        self.distalWeights[i] = self._learn(self.distalMovingAverages[i], self.distalMovingAverageBias[i], self.distalMovingAverageInput[i])
+        self.distalWeights[i], \
+        self.distalBias[i] = self._learn(self.distalMovingAverages[i], self.distalMovingAverageBias[i], self.distalMovingAverageInput[i])
 
       # Internal distal learning
-      self.internalDistalWeights = self._learn(self.internalDistalMovingAverages, self.internalDistalMovingAverageBias, self.internalDistalMovingAverageInput)
+      self.internalDistalWeights, \
+      self.internalDistalBias = self._learn(self.internalDistalMovingAverages, self.internalDistalMovingAverageBias, self.internalDistalMovingAverageInput)
 
 
   def _computeInferenceMode(self, feedforwardInput, lateralInputs):
@@ -356,19 +362,19 @@ class BayesianColumnPooler(object):
     prevActiveCellIndices = np.where(prevActiveCells >= self.activationThreshold)[0]
 
     # Calculate the feedforward supported cells
-    feedForwardActivation = self._activation(self.proximalWeights, feedforwardInput, self.noise)
+    feedForwardActivation = self._activation(self.proximalWeights, feedforwardInput, self.proximalBias, self.noise)
     feedforwardSupportedCells = np.where(feedForwardActivation >= self.activationThreshold)[0]
 
     # Calculate the number of active distal segments (internal and lateral) on each cell
     numActiveSegmentsByCell = np.zeros(self.cellCount, dtype="int")
 
     # Internal Distal
-    internalDistalActivation = self._activation(self.internalDistalWeights, prevActiveCells, self.noise)
+    internalDistalActivation = self._activation(self.internalDistalWeights, prevActiveCells, self.internalDistalBias, self.noise)
     numActiveSegmentsByCell[internalDistalActivation >= self.activationThreshold] += 1
 
     # Lateral connections to other cortical columns
     for i, lateralInput in enumerate(lateralInputs):
-      distalActivation = self._activation(self.distalWeights[i], lateralInput, self.noise)
+      distalActivation = self._activation(self.distalWeights[i], lateralInput, self.distalBias[i], self.noise)
       numActiveSegmentsByCell[distalActivation >= self.activationThreshold] += 1
 
     chosenCells = np.array([], dtype="int")
@@ -547,17 +553,16 @@ class BayesianColumnPooler(object):
     return movingAverage, movingAverageBias, movingAverageInput
 
   @staticmethod
-  def _activation(weights, input, noise):
-    # TODO: Clean up - separate bias term
+  def _activation(weights, input, bias, noise, use_bias=True):
+    # Runtime warnings for negative infinity can be ignored here
     activeMask = input > 0
-    bias = weights[:, -1]
-    w = weights[:, :-1]
-    # Filter -inf values to avoid non defined sum
-    logW = np.log(np.multiply(w[:, activeMask], input[activeMask]) + noise)
-    # Special case if active mask has no active inputs (should not occur)
+    # Only sum over active input -> otherwise large negative sum due to sparse activity and 0 inputs with noise
+    activation = np.log(np.multiply(weights[:, activeMask], input[activeMask]) + noise)
+    # Special case if active mask has no active inputs (e.g initialisation)
     # then activation becomes 0 and hence the exp of it 1
-    logW = logW.sum(axis=1) if np.any(activeMask) else logW.sum(axis=1) + np.NINF
-    return np.exp(logW + bias)
+    activation = activation.sum(axis=1) if np.any(activeMask) else activation.sum(axis=1) + np.NINF
+    activation = activation if not use_bias else activation + bias
+    return np.exp(activation)
 
   @staticmethod
   def _learn(movingAverages, movingAverageBias, movingAveragesInput):
@@ -570,10 +575,9 @@ class BayesianColumnPooler(object):
 
     # Unused segments are set to -inf. That is desired since we take the exp function for the activation
     # exp(-inf) = 0 what is the desired outcome
-    bias = np.log(movingAverageBias).reshape(1, movingAverageBias.shape[0])
-    weights = np.concatenate((weights, bias.T), axis=1)
+    bias = np.log(movingAverageBias)
 
-    return weights
+    return weights, bias
 
 #
 # Functionality that could be added to the C code or bindings
