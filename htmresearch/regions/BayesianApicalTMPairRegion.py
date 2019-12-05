@@ -331,7 +331,7 @@ class BayesianApicalTMPairRegion(PyRegion):
         "maxSegmentsPerCell": self.maxSegmentsPerCell,
         "seed": self.seed,
         "noise": self.noise,
-        "learningRate": self.learningRate
+        "learningRate": self.learningRate,
       }
 
       if self.implementation == "BayesianApicalTiebreak":

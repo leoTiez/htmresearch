@@ -198,8 +198,8 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     @param apicalInput (numpy array)
     List of active input bits for the apical dendrite segments
     """
-    activation_basal = self._calculateSegmentActivity(self.basalWeights, basalInput, self.basalBias, use_bias=True)
-    activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.apicalBias, use_bias=False)
+    activation_basal = self._calculateSegmentActivity(self.basalWeights, basalInput, self.basalBias, self.noise, use_bias=True)
+    activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.apicalBias, self.noise, use_bias=False)
 
     activation_basal = np.exp(activation_basal)
     activation_apical = np.exp(activation_apical)
@@ -374,7 +374,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
       segmentCount[burstingColumns, min_segment_cells_ind].astype('int32'),
       min_segment_cells_ind,
       burstingColumns
-    ] = self.minThreshold
+    ] = 1 # self.minThreshold
     update_ind = segmentCount[
       burstingColumns,
       min_segment_cells_ind
@@ -391,7 +391,8 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     return np.argmin(segmentCount, axis=1)
 
   def _setNonActiveSegments(self, segments, inactiveColumns, isApical=False):
-    segments[segments < self.minThreshold] = 0.0
+    # Set all segments to zero, whose cells did not get activated
+    segments[:, self.predictedCells < self.minThreshold] = 0.0
     segments = self._reshapeSegmentsToColumnBased(segments, isApical=isApical)
     segments[:, :, inactiveColumns] = 0.0
     return self._reshapeSegmetsFromColumnBased(segments, isApical=isApical)
@@ -472,9 +473,14 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     return movingAverage, movingAverageBias, movingAverageInput
 
   @staticmethod
-  def _calculateSegmentActivity(weights, activeInput, bias, use_bias=True):
+  def _calculateSegmentActivity(weights, activeInput, bias, noise, use_bias=True):
     # Runtime warnings for negative infinity can be ignored here
-    activation = np.log(np.multiply(weights, activeInput)).sum(axis=2)
+    activeMask = activeInput > 0
+    # Only sum over active input -> otherwise large negative sum due to sparse activity and 0 inputs with noise
+    activation = np.log(np.multiply(weights[:, :, activeMask], activeInput[activeMask]) + noise)
+    # Special case if active mask has no active inputs (e.g initialisation)
+    # then activation becomes 0 and hence the exp of it 1
+    activation = activation.sum(axis=2) if np.any(activeMask) else activation.sum(axis=2) + np.NINF
     return activation if not use_bias else activation + bias
 
   def _calculatePredictedCells(self, activeBasalSegments, activeApicalSegments):

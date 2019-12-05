@@ -252,10 +252,10 @@ def runExperiment():
   or 3 columns
   """
   numColumns = 3
-  numFeatures = 3
-  numPoints = 10
-  numLocations = 10
-  numObjects = 10
+  numFeatures = 3 # new: 3 # original: 3
+  numPoints = 5 # new: 5 # original: 10
+  numLocations = 5 # new: 5 # original: 10
+  numObjects = 2 # new: 2 # original: 10
   numRptsPerSensation = 2
 
   objectMachine = createObjectMachine(
@@ -280,14 +280,33 @@ def runExperiment():
       featureLocations.append({0: objects[i][j][0]})
     objectsSingleColumn[i] = featureLocations
 
+  # params
   maxNumSegments = 2
+  L2Overrides = {
+    "learningRate": 0.1, 
+    "noise": 0.01,
+    "cellCount": 256, # new: 256 # original: 4096
+    "inputWidth": 8192, # new: 8192 # original: 16384 (?)
+  }
+
+  L4Overrides = {
+    "learningRate": 0.1,
+    "noise": 0.01,
+    "cellsPerColumn": 4, # new: 4 # original 32
+    "columnCount": 2048, # new: 2048 # original: 2048
+    "minThreshold": 0.35,
+  }
+
   exp1 = L4L2Experiment(
     'single_column',
     implementation='BayesianApicalTiebreak',
     L2RegionType="py.BayesianColumnPoolerRegion",
     L4RegionType="py.BayesianApicalTMPairRegion",
+    L2Overrides=L2Overrides,
+    L4Overrides=L4Overrides,
     numCorticalColumns=1,
     maxSegmentsPerCell=maxNumSegments,
+    numLearningPoints=3,
     seed=1
   )
 
@@ -344,11 +363,29 @@ def runExperiment():
 
   print "Exactly SDR-Size activity (%s) after %s steps" % (sdrSize, singleColumnHighlight)
   print "Converged to first object representation after %s steps" % converged
-  print "First Object representation", firstObjectRepresentation
-  print "L2 Output over steps", l2ActiveCellsSingleColumn
 
-  plotActivity(l2ActiveCellsSingleColumn, singleColumnHighlight)
-  plotL2ObjectRepresentations(exp1)
+  print "Overlaps of each l2-representation (after new sensation) to each object"
+  for idx in range(0, len(l2ActiveCellsSingleColumn)):
+    print "overlap of l2-representation %s" % idx
+    for i in range(0, len(exp1.objectL2Representations)):
+      object = exp1.objectL2Representations[i][0]
+      l2Representation = l2ActiveCellsSingleColumn[idx][0]
+      overlap = len(l2Representation.intersection(object))
+      print "\tTo object %s is %s/%s" % (i, overlap, len(l2Representation))
+
+  print "First Object representation", np.sort(list(firstObjectRepresentation))
+
+  print "\n\nL2 Output over steps"
+  for idx in range(0, len(l2ActiveCellsSingleColumn)):
+    rep = np.sort(list(l2ActiveCellsSingleColumn[idx][0]))
+    print len(rep), rep
+  print "\n\nObject representations L2"
+  for idx in range(0, len(exp1.objectL2Representations)):
+    obj = np.sort(list(exp1.objectL2Representations[idx][0]))
+    print len(obj), obj
+
+  # plotActivity(l2ActiveCellsSingleColumn, singleColumnHighlight)
+  # plotL2ObjectRepresentations(exp1)
 
   # Multi column experiment
   # exp3 = L4L2Experiment(

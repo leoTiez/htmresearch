@@ -310,7 +310,7 @@ class BayesianColumnPooler(object):
       self.internalDistalMovingAverages,
       self.internalDistalMovingAverageBias,
       self.internalDistalMovingAverageInput,
-      self.activeCells,
+      prevActiveCells,
       self.cellCount,
       temporalLearningRate,
     )
@@ -318,8 +318,8 @@ class BayesianColumnPooler(object):
     # Learning
     # If we have a union of cells active, don't learn.  This primarily affects
     # online learning.
-    if self.numberOfActiveCells() > self.maxSdrSize:
-      return
+    # if self.numberOfActiveCells() > self.maxSdrSize:
+    #  return
 
     # Finally, now that we have decided which cells we should be learning on, do
     # the actual learning.
@@ -356,22 +356,19 @@ class BayesianColumnPooler(object):
     prevActiveCellIndices = np.where(prevActiveCells >= self.activationThreshold)[0]
 
     # Calculate the feedforward supported cells
-    input = np.append(feedforwardInput, 1) # include bias term
-    feedForwardActivation = np.exp(np.multiply(self.proximalWeights, input).sum(axis=1))
+    feedForwardActivation = self._activation(self.proximalWeights, feedforwardInput, self.noise)
     feedforwardSupportedCells = np.where(feedForwardActivation >= self.activationThreshold)[0]
 
     # Calculate the number of active distal segments (internal and lateral) on each cell
     numActiveSegmentsByCell = np.zeros(self.cellCount, dtype="int")
 
     # Internal Distal
-    prevActiveCellsVector = np.append(prevActiveCells, 1) # include bias term
-    internalDistalActivation = np.exp(np.multiply(self.internalDistalWeights, prevActiveCellsVector).sum(axis=1))
+    internalDistalActivation = self._activation(self.internalDistalWeights, prevActiveCells, self.noise)
     numActiveSegmentsByCell[internalDistalActivation >= self.activationThreshold] += 1
 
     # Lateral connections to other cortical columns
     for i, lateralInput in enumerate(lateralInputs):
-      lateralInputVector = np.append(lateralInput, 1)
-      distalActivation = np.exp(np.multiply(self.distalWeights[i], lateralInputVector).sum(axis=1))
+      distalActivation = self._activation(self.distalWeights[i], lateralInput, self.noise)
       numActiveSegmentsByCell[distalActivation >= self.activationThreshold] += 1
 
     chosenCells = np.array([], dtype="int")
@@ -448,6 +445,10 @@ class BayesianColumnPooler(object):
     # TODO: Inference mode only sets them to 1, but we could calculate a value from the proximal/distal support
     self.activeCells[chosenCells] = 1 # feedForwardActivation[chosenCells] + distal/lateral mult/sum?
 
+    print "Column pooler inference input/distalSupport/output"
+    print feedforwardInput.nonzero()
+    print numActiveSegmentsByCell[numActiveSegmentsByCell > 0]
+    print self.activeCells.nonzero()
 
   def numberOfInputs(self):
     """
@@ -545,6 +546,18 @@ class BayesianColumnPooler(object):
     )
     return movingAverage, movingAverageBias, movingAverageInput
 
+  @staticmethod
+  def _activation(weights, input, noise):
+    # TODO: Clean up - separate bias term
+    activeMask = input > 0
+    bias = weights[:, -1]
+    w = weights[:, :-1]
+    # Filter -inf values to avoid non defined sum
+    logW = np.log(np.multiply(w[:, activeMask], input[activeMask]) + noise)
+    # Special case if active mask has no active inputs (should not occur)
+    # then activation becomes 0 and hence the exp of it 1
+    logW = logW.sum(axis=1) if np.any(activeMask) else logW.sum(axis=1) + np.NINF
+    return np.exp(logW + bias)
 
   @staticmethod
   def _learn(movingAverages, movingAverageBias, movingAveragesInput):
