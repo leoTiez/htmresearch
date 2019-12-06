@@ -444,9 +444,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     if learningRate is None:
       learningRate = self.learningRate
 
-      # TODO: Should this be included in the if statement?
-      numSegments = self.numApicalSegments if isApical else self.numBasalSegments
-
+    numSegments = self.numApicalSegments if isApical else self.numBasalSegments
     # Updating moving average weights to input
     noisy_connection_matrix = np.outer((1 - self.noise**2) * segments, inputValues)
     # Consider only active segments
