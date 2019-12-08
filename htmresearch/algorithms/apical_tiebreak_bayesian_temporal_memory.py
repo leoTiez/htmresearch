@@ -293,31 +293,32 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     self.activeBasalSegments = self._setNonActiveSegments(self.activeBasalSegments, inactive_columns)
     self.activeApicalSegments = self._setNonActiveSegments(self.activeApicalSegments, inactive_columns, isApical=True)
 
-    # Update moving averages
-    # TODO updates moving averages of segments when they have sufficient activiation even if they have not been previously used -> Required?
-    self.basalMovingAverages, self.basalMovingAveragesBias, self.basalMovingAverageInput = self._updateMovingAverage(
-      self.activeBasalSegments,
-      self.basalMovingAverages,
-      self.basalMovingAveragesBias,
-      self.basalMovingAverageInput,
-      self.basalInput,
-      self.basalInputSize,
-      temporalLearningRate,
-      isApical=False
-    )
-    self.apicalMovingAverages, self.apicalMovingAveragesBias, self.apicalMovingAverageInput = self._updateMovingAverage(
-      self.activeApicalSegments,
-      self.apicalMovingAverages,
-      self.apicalMovingAveragesBias,
-      self.apicalMovingAverageInput,
-      self.apicalInput,
-      self.apicalInputSize,
-      temporalLearningRate,
-      isApical=True
-    )
-
     # Learn
     if learn:
+      # Update moving averages
+      # TODO updates moving averages of segments when they have sufficient activiation even if they have not been previously used -> Required?
+      # moved to the if statement to prevent update while learning TODO implement temporal learning rate as parameter such that it can be passed from outside
+      self.basalMovingAverages, self.basalMovingAveragesBias, self.basalMovingAverageInput = self._updateMovingAverage(
+        self.activeBasalSegments,
+        self.basalMovingAverages,
+        self.basalMovingAveragesBias,
+        self.basalMovingAverageInput,
+        self.basalInput,
+        self.basalInputSize,
+        temporalLearningRate,
+        isApical=False
+      )
+      self.apicalMovingAverages, self.apicalMovingAveragesBias, self.apicalMovingAverageInput = self._updateMovingAverage(
+        self.activeApicalSegments,
+        self.apicalMovingAverages,
+        self.apicalMovingAveragesBias,
+        self.apicalMovingAverageInput,
+        self.apicalInput,
+        self.apicalInputSize,
+        temporalLearningRate,
+        isApical=True
+      )
+
       self.basalWeights, self.basalBias = self._learn(
         self.basalMovingAverages,
         self.basalMovingAveragesBias,
