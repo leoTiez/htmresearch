@@ -24,7 +24,7 @@
 import numpy as np
 
 from htmresearch.support import numpy_helpers as np2
-from nupic.bindings.math import Random, SparseMatrixConnections
+from nupic.bindings.math import Random
 
 
 class ApicalTiebreakBayesianTemporalMemory(object):
@@ -125,22 +125,27 @@ class ApicalTiebreakBayesianTemporalMemory(object):
       (self.numBasalSegments, self.columnCount*self.cellsPerColumn, self.basalInputSize))
     # Initialise weights to first segment randomly
     # TODO check whether this is necessary. Setting it zero should conceptually work. What is the outcome?
-    self.basalWeights[0, :, :] = np.random.random(self.basalWeights[0, :, :].shape)
+    # self.basalWeights[0, :, :] = np.random.random(self.basalWeights[0, :, :].shape)
     self.apicalWeights = np.zeros(
       (self.numApicalSegments, self.columnCount*self.cellsPerColumn, self.apicalInputSize))
     # Initialise weights to first segment randomly
-    self.apicalWeights[0, :, :] = np.random.random(self.apicalWeights[0, :, :].shape)
+    # self.apicalWeights[0, :, :] = np.random.random(self.apicalWeights[0, :, :].shape)
     self.basalBias = np.zeros((self.numBasalSegments, self.columnCount*self.cellsPerColumn))
     self.apicalBias = np.zeros((self.numApicalSegments, self.columnCount*self.cellsPerColumn))
 
-    self.basalMovingAverages = np.zeros(
-      (self.numBasalSegments, self.columnCount*self.cellsPerColumn, self.basalInputSize))
-    self.apicalMovingAverages = np.zeros(
-      (self.numApicalSegments, self.columnCount*self.cellsPerColumn, self.apicalInputSize))
-    self.basalMovingAveragesBias = np.zeros((self.numBasalSegments, self.columnCount * self.cellsPerColumn))
-    self.apicalMovingAveragesBias = np.zeros((self.numApicalSegments, self.columnCount * self.cellsPerColumn))
-    self.basalMovingAverageInput = np.zeros(self.basalInputSize)
-    self.apicalMovingAverageInput = np.zeros(self.apicalInputSize)
+    # Initialize moving averages with 1/(M_i*M_j), 1/(M_i) or 1/(M_j)
+    self.basalMovingAverages = np.full(
+      (self.numBasalSegments, self.columnCount*self.cellsPerColumn, self.basalInputSize),
+      1.0/(self.numberOfCells()*self.basalInputSize)
+    )
+    self.apicalMovingAverages = np.full(
+      (self.numApicalSegments, self.columnCount*self.cellsPerColumn, self.apicalInputSize),
+      1.0/(self.numberOfCells()*self.apicalInputSize)
+    )
+    self.basalMovingAveragesBias = np.full((self.numBasalSegments, self.numberOfCells()), 1.0)
+    self.apicalMovingAveragesBias = np.full((self.numApicalSegments, self.numberOfCells()), 1.0)
+    self.basalMovingAverageInput = np.full(self.basalInputSize, 1.0)
+    self.apicalMovingAverageInput = np.full(self.apicalInputSize, 1.0)
 
     # Set to zero to use randomly initialized first weight value
     self.basalSegmentCount = np.zeros((self.columnCount, self.cellsPerColumn))
@@ -197,13 +202,9 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
     @param apicalInput (numpy array)
     List of active input bits for the apical dendrite segments
-
-    @param learn (bool)
-    Whether learning is enabled. Some TM implementations may depolarize cells
-    differently or do segment activity bookkeeping when learning is enabled.
     """
-    activation_basal = self._calculateSegmentActivity(self.basalWeights, basalInput, self.basalBias, use_bias=True)
-    activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.apicalBias, use_bias=False)
+    activation_basal = self._calculateSegmentActivity(self.basalWeights, basalInput, self.basalBias, self.noise, use_bias=True)
+    activation_apical = self._calculateSegmentActivity(self.apicalWeights, apicalInput, self.apicalBias, self.noise, use_bias=False)
 
     activation_basal = np.exp(activation_basal)
     activation_apical = np.exp(activation_apical)
@@ -246,11 +247,11 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     all_columns = np.arange(0, self.numberOfColumns())
     # Get all inactive columns and set their respective predicted cells to zero
     inactive_columns = np.setdiff1d(all_columns, activeColumns)
-    active_cells_before_burst = self._reshapeCellsToColumnBased(self.predictedCells.copy())
-    active_cells_before_burst[:, inactive_columns] = 0
+    predicted_cells_before_burst = self._reshapeCellsToColumnBased(self.predictedCells.copy())
+    predicted_cells_before_burst[:, inactive_columns] = 0
     # find bursting columns
     bursting_columns = activeColumns[np.where(
-      np.abs(active_cells_before_burst[:, activeColumns].sum(axis=0)
+      np.abs(predicted_cells_before_burst[:, activeColumns].sum(axis=0)
              ) < self.minThreshold)]  # Use this because of numerical issues. Sum over all cells should be zero
                                       # If there is one active cell, the sum over all cells >= thresold
                                       # TODO consider change if normalisation is changed
@@ -334,15 +335,17 @@ class ApicalTiebreakBayesianTemporalMemory(object):
       )
 
   def _calculatePredictedValues(self, activation_basal, activation_apical):
+    # TODO: We can not interpret it as probability anymore when adding apical+basal activation
     predicted_cells = self._calculatePredictedCells(activation_basal, activation_apical)
+    # TODO when apply threshold -> experiments
+    predicted_cells[predicted_cells < self.minThreshold] = 0.0
+    # TODO: Update status report to normalize before activation
     normalisation = self._reshapeCellsToColumnBased(predicted_cells).sum(axis=0)
     predicted_cells = self._reshapeCellsFromColumnBased(
       self._reshapeCellsToColumnBased(predicted_cells)
       / normalisation.reshape((1, normalisation.shape[0]))
     )
     predicted_cells[np.isnan(predicted_cells)] = 0
-    # TODO when apply threshold -> experiments
-    predicted_cells[predicted_cells < self.minThreshold] = 0.0
     return predicted_cells
 
   def _addNewSegments(self, isApical=False):
@@ -376,7 +379,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
       segmentCount[burstingColumns, min_segment_cells_ind].astype('int32'),
       min_segment_cells_ind,
       burstingColumns
-    ] = self.minThreshold
+    ] = 1 # self.minThreshold
     update_ind = segmentCount[
       burstingColumns,
       min_segment_cells_ind
@@ -393,7 +396,8 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     return np.argmin(segmentCount, axis=1)
 
   def _setNonActiveSegments(self, segments, inactiveColumns, isApical=False):
-    segments[segments < self.minThreshold] = 0.0
+    # Set all segments to zero, whose cells did not get activated
+    segments[:, self.predictedCells < self.minThreshold] = 0.0
     segments = self._reshapeSegmentsToColumnBased(segments, isApical=isApical)
     segments[:, :, inactiveColumns] = 0.0
     return self._reshapeSegmetsFromColumnBased(segments, isApical=isApical)
@@ -445,8 +449,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     if learningRate is None:
       learningRate = self.learningRate
 
-      numSegments = self.numApicalSegments if isApical else self.numBasalSegments
-
+    numSegments = self.numApicalSegments if isApical else self.numBasalSegments
     # Updating moving average weights to input
     noisy_connection_matrix = np.outer((1 - self.noise**2) * segments, inputValues)
     # Consider only active segments
@@ -473,9 +476,14 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     return movingAverage, movingAverageBias, movingAverageInput
 
   @staticmethod
-  def _calculateSegmentActivity(weights, activeInput, bias, use_bias=True):
+  def _calculateSegmentActivity(weights, activeInput, bias, noise, use_bias=True):
     # Runtime warnings for negative infinity can be ignored here
-    activation = np.log(np.multiply(weights, activeInput)).sum(axis=2)
+    activeMask = activeInput > 0
+    # Only sum over active input -> otherwise large negative sum due to sparse activity and 0 inputs with noise
+    activation = np.log(np.multiply(weights[:, :, activeMask], activeInput[activeMask]) + noise)
+    # Special case if active mask has no active inputs (e.g initialisation)
+    # then activation becomes 0 and hence the exp of it 1
+    activation = activation.sum(axis=2) if np.any(activeMask) else activation.sum(axis=2) + np.NINF
     return activation if not use_bias else activation + bias
 
   def _calculatePredictedCells(self, activeBasalSegments, activeApicalSegments):
@@ -493,7 +501,8 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
     @return (numpy array)
     """
-    max_cells = (activeBasalSegments + activeApicalSegments).max(axis=0)
+    # add back again + activeApicalSegments
+    max_cells = (activeBasalSegments).max(axis=0)
 
     return max_cells
 
@@ -567,7 +576,6 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     Active cells
     """
     return self.getActiveCellsIndices()
-    # return self.activeCells
 
   def getActiveBasalSegments(self):
     """
@@ -687,12 +695,6 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemory):
         basalInput_temp[basalInput] = 1.0
         basalInput = basalInput_temp
 
-    if apicalInput.shape[0] < self.apicalInputSize:
-      if apicalInput.dtype == np.int64:
-        apicalInput_temp = np.zeros(self.apicalInputSize)
-        apicalInput_temp[apicalInput] = 1.0
-        apicalInput = apicalInput_temp
-
     self.depolarizeCells(basalInput, apicalInput)
     self.activateCells(activeColumns, learn=learn, temporalLearningRate=None)
 
@@ -712,157 +714,23 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemory):
     # return self.predictedCells
 
 
-  def getBasalPredictedCells(self):
+  def getBasalPredictedCellValues(self):
     """
     @return (numpy array)
     Cells with active basal segments
     """
-    # TODO check where this is called
+    return self.predictedCells
+
+  def getBasalPredictedCellIndices(self):
     return self.getPredictedCellsIndices()
-    # return self.predictedCells
 
-
-  def getApicalPredictedCells(self):
+  def getApicalPredictedCellValues(self):
     """
     @return (numpy array)
     Cells with active apical segments
     """
-    # TODO check where this is called
+    return self.predictedCells
+
+
+  def getApicalPredictedCellIndices(self):
     return self.getPredictedCellsIndices()
-    # return self.predictedCells
-
-
-
-#
-# class ApicalTiebreakSequenceMemory(ApicalTiebreakTemporalMemory):
-#   """
-#   Sequence memory with apical tiebreak.
-#   """
-#
-#   def __init__(self,
-#                columnCount=2048,
-#                apicalInputSize=0,
-#                cellsPerColumn=32,
-#                activationThreshold=13,
-#                reducedBasalThreshold=13,
-#                initialPermanence=0.21,
-#                connectedPermanence=0.50,
-#                minThreshold=10,
-#                sampleSize=20,
-#                permanenceIncrement=0.1,
-#                permanenceDecrement=0.1,
-#                basalPredictedSegmentDecrement=0.0,
-#                apicalPredictedSegmentDecrement=0.0,
-#                maxSynapsesPerSegment=-1,
-#                seed=42):
-#     params = {
-#       "columnCount": columnCount,
-#       "basalInputSize": columnCount * cellsPerColumn,
-#       "apicalInputSize": apicalInputSize,
-#       "cellsPerColumn": cellsPerColumn,
-#       "activationThreshold": activationThreshold,
-#       "reducedBasalThreshold": reducedBasalThreshold,
-#       "initialPermanence": initialPermanence,
-#       "connectedPermanence": connectedPermanence,
-#       "minThreshold": minThreshold,
-#       "sampleSize": sampleSize,
-#       "permanenceIncrement": permanenceIncrement,
-#       "permanenceDecrement": permanenceDecrement,
-#       "basalPredictedSegmentDecrement": basalPredictedSegmentDecrement,
-#       "apicalPredictedSegmentDecrement": apicalPredictedSegmentDecrement,
-#       "maxSynapsesPerSegment": maxSynapsesPerSegment,
-#       "seed": seed,
-#     }
-#
-#     super(ApicalTiebreakSequenceMemory, self).__init__(**params)
-#
-#     self.prevApicalInput = np.empty(0, dtype="uint32")
-#     self.prevApicalGrowthCandidates = np.empty(0, dtype="uint32")
-#     self.prevPredictedCells = np.empty(0, dtype="uint32")
-#
-#
-#   def reset(self):
-#     """
-#     Clear all cell and segment activity.
-#     """
-#     super(ApicalTiebreakSequenceMemory, self).reset()
-#
-#     self.prevApicalInput = np.empty(0, dtype="uint32")
-#     self.prevApicalGrowthCandidates = np.empty(0, dtype="uint32")
-#     self.prevPredictedCells = np.empty(0, dtype="uint32")
-#
-#
-#   def compute(self,
-#               activeColumns,
-#               apicalInput=(),
-#               apicalGrowthCandidates=None,
-#               learn=True):
-#     """
-#     Perform one timestep. Activate the specified columns, using the predictions
-#     from the previous timestep, then learn. Then form a new set of predictions
-#     using the new active cells and the apicalInput.
-#
-#     @param activeColumns (numpy array)
-#     List of active columns
-#
-#     @param apicalInput (numpy array)
-#     List of active input bits for the apical dendrite segments
-#
-#     @param apicalGrowthCandidates (numpy array or None)
-#     List of bits that the active cells may grow new apical synapses to
-#     If None, the apicalInput is assumed to be growth candidates.
-#
-#     @param learn (bool)
-#     Whether to grow / reinforce / punish synapses
-#     """
-#     activeColumns = np.asarray(activeColumns)
-#     apicalInput = np.asarray(apicalInput)
-#
-#     if apicalGrowthCandidates is None:
-#       apicalGrowthCandidates = apicalInput
-#     apicalGrowthCandidates = np.asarray(apicalGrowthCandidates)
-#
-#     self.prevPredictedCells = self.predictedCells
-#
-#     self.activateCells(activeColumns, self.activeCells, self.prevApicalInput,
-#                        self.winnerCells, self.prevApicalGrowthCandidates, learn)
-#     self.depolarizeCells(self.activeCells, apicalInput, learn)
-#
-#     self.prevApicalInput = apicalInput.copy()
-#     self.prevApicalGrowthCandidates = apicalGrowthCandidates.copy()
-#
-#
-#   def getPredictedCells(self):
-#     """
-#     @return (numpy array)
-#     The prediction from the previous timestep
-#     """
-#     return self.prevPredictedCells
-#
-#
-#   def getNextPredictedCells(self):
-#     """
-#     @return (numpy array)
-#     The prediction for the next timestep
-#     """
-#     return self.predictedCells
-#
-#
-#   def getNextBasalPredictedCells(self):
-#     """
-#     @return (numpy array)
-#     Cells with active basal segments
-#     """
-#     return np.unique(
-#       self.basalConnections.mapSegmentsToCells(
-#         self.activeBasalSegments))
-#
-#
-#   def getNextApicalPredictedCells(self):
-#     """
-#     @return (numpy array)
-#     Cells with active apical segments
-#     """
-#     return np.unique(
-#       self.apicalConnections.mapSegmentsToCells(
-#         self.activeApicalSegments))

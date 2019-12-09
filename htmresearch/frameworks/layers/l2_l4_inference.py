@@ -137,6 +137,7 @@ class L4L2Experiment(object):
                externalInputSize=1024,
                numExternalInputBits=20,
                L2Overrides=None,
+               L2RegionType="py.ColumnPoolerRegion",
                L4RegionType="py.ApicalTMPairRegion",
                networkType = "MultipleL4L2Columns",
                implementation=None,
@@ -180,6 +181,9 @@ class L4L2Experiment(object):
 
     @param   L2Overrides (dict)
              Parameters to override in the L2 region
+
+    @param   L2RegionType (string)
+             The type of region to use for L2
 
     @param   L4RegionType (string)
              The type of region to use for L4
@@ -257,6 +261,7 @@ class L4L2Experiment(object):
         "numCorticalColumns": numCorticalColumns,
         "externalInputSize": externalInputSize,
         "sensorInputSize": inputSize,
+        "L2RegionType": L2RegionType,
         "L4RegionType": L4RegionType,
         "L4Params": self.getDefaultL4Params(inputSize, numExternalInputBits),
         "L2Params": self.getDefaultL2Params(inputSize, numInputBits),
@@ -271,9 +276,10 @@ class L4L2Experiment(object):
           "numCorticalColumns": numCorticalColumns,
           "externalInputSize": externalInputSize,
           "sensorInputSize": inputSize,
+          "L2RegionType": L2RegionType,
           "L4RegionType": L4RegionType,
           "L4Params": self.getBayesianL4Params(inputSize, numExternalInputBits),
-          "L2Params": self.getDefaultL2Params(inputSize, numInputBits),
+          "L2Params": self.getBayesianL2Params(inputSize, numInputBits),
         }
         self.config["L4Params"]["maxSegmentsPerCell"] = maxSegmentsPerCell
 
@@ -387,6 +393,7 @@ class L4L2Experiment(object):
 
     for objectName, sensationList in objects.iteritems():
 
+      print("learn", objectName, )
       # ignore empty sensation lists
       if len(sensationList) == 0:
         continue
@@ -934,6 +941,24 @@ class L4L2Experiment(object):
       "learningMode": True,
     }
 
+  def getBayesianL2Params(self, inputSize, numInputBits):
+    """
+    Returns a good default set of parameters to use in the L2 region.
+    """
+
+    return {
+      "inputWidth": inputSize * 16,
+      "cellCount": 4096,
+      "sdrSize": 40,
+      "sampleSizeProximal": int(numInputBits * .6),
+      "seed": self.seed,
+      "learningMode": True,
+
+      # new
+      "noise": 0.01,  # lambda
+      "learningRate": 0.1,  # alpha
+      "activationThreshold": 0.5,  # used for cell activation & competition through distal segment activity
+    }
 
   def getDefaultLateralSPParams(self, inputSize):
     return {

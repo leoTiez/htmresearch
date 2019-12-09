@@ -1,6 +1,7 @@
 #!/usr/bin/python2.7
 import random
 import matplotlib
+import numpy as np
 matplotlib.use("Agg")
 from htmresearch.frameworks.layers.object_machine_factory import (createObjectMachine)
 from htmresearch.frameworks.layers.l2_l4_inference import L4L2Experiment
@@ -21,7 +22,7 @@ def runExperiment():
   numFeatures = 3
   numPoints = 10
   numLocations = 10
-  numObjects = 2 # 10
+  numObjects = 10 # 2
   numRptsPerSensation = 2
 
   objectMachine = createObjectMachine(
@@ -46,7 +47,7 @@ def runExperiment():
       featureLocations.append({0: objects[i][j][0]})
     objectsSingleColumn[i] = featureLocations
 
-  maxNumSegemnts = 2
+  maxNumSegments = 2
   # we will run two experiments side by side, with either single column
   # or 3 columns
   # exp3 = L4L2Experiment(
@@ -61,9 +62,10 @@ def runExperiment():
   exp1 = L4L2Experiment(
     'single_column',
     implementation='BayesianApicalTiebreak',
+    L2RegionType="py.BayesianColumnPoolerRegion",
     L4RegionType="py.BayesianApicalTMPairRegion",
     numCorticalColumns=1,
-    maxSegmentsPerCell=maxNumSegemnts,
+    maxSegmentsPerCell=maxNumSegments,
     seed=1
   )
 
@@ -130,9 +132,15 @@ def runExperiment():
   singleColumnHighlight = next(
     (idx for idx, value in enumerate(l2ActiveCellsSingleColumn)
      if len(value[0]) == sdrSize), None)
+  firstObjectRepresentation = exp1.objectL2Representations[0][0]
+  converged = next(
+    (idx for idx, value in enumerate(l2ActiveCellsSingleColumn)
+     if (value[0] == firstObjectRepresentation)), None)
 
-  print "SDR size", sdrSize
-  print singleColumnHighlight
+  print "Exactly SDR-Size activity (%s) after %s steps" % (sdrSize, singleColumnHighlight)
+  print "Converged to first object representation after %s steps" % converged
+  print "First Object representation", firstObjectRepresentation
+  print "L2 Output over steps", l2ActiveCellsSingleColumn
 
 if __name__ == "__main__":
   runExperiment()

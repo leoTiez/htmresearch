@@ -247,7 +247,7 @@ def createL4L2Column(network, networkConfig, suffix=""):
     L4ColumnName, networkConfig["L4RegionType"],
     json.dumps(L4Params))
   network.addRegion(
-    L2ColumnName, "py.ColumnPoolerRegion",
+    L2ColumnName, networkConfig["L2RegionType"],
     json.dumps(networkConfig["L2Params"]))
 
   # Set phases appropriately so regions are executed in the proper sequence

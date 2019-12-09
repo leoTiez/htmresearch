@@ -331,7 +331,7 @@ class BayesianApicalTMPairRegion(PyRegion):
         "maxSegmentsPerCell": self.maxSegmentsPerCell,
         "seed": self.seed,
         "noise": self.noise,
-        "learningRate": self.learningRate
+        "learningRate": self.learningRate,
       }
 
       if self.implementation == "BayesianApicalTiebreak":
@@ -368,21 +368,19 @@ class BayesianApicalTMPairRegion(PyRegion):
       basalInput = np.empty(0, dtype="uint32")
 
     if "apicalInput" in inputs:
-      apicalInput = inputs["apicalInput"].nonzero()[0]
+      apicalInput = np.asarray(inputs["apicalInput"], dtype="float64")
     else:
       apicalInput = np.empty(0, dtype="uint32")
 
     self._tm.compute(activeColumns, basalInput, apicalInput, self.learn)
 
-    # Extract the active / predicted cells and put them into binary arrays.
     activeCellsIndices = self._tm.getActiveCellsIndices()
     predictedCellsIndices = self._tm.getPredictedCellsIndices()
     activeCellsValues = self._tm.getActiveCellsValues()
     predictedCellsValues = self._tm.getPredictedCellsValues()
     predictedActivatedIndices = np.intersect1d(activeCellsIndices, predictedCellsIndices)
-    outputs["activeCells"][:] = 0
-    outputs["activeCells"][activeCellsIndices] = activeCellsValues[activeCellsIndices]
-    outputs["predictedCells"][:] = 0
+    outputs["activeCells"][:] = activeCellsValues
+    outputs["predictedCells"][:] = predictedCellsValues
     outputs["predictedCells"][predictedCellsIndices] = predictedCellsValues[predictedCellsIndices]
     outputs["predictedActiveCells"][:] = 0
     outputs["predictedActiveCells"][predictedActivatedIndices] = activeCellsValues[predictedActivatedIndices]
