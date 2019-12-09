@@ -628,7 +628,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
 
 # TODO adapt class for the compute method which is used as a common interface
-class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemory):
+class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemory):
   """
   Pair memory with apical tiebreak.
   """
