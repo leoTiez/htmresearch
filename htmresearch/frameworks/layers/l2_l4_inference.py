@@ -268,7 +268,7 @@ class L4L2Experiment(object):
       }
 
     else:
-      if implementation is "BayesianApicalTiebreak":
+      if "Bayesian" is in implementation:
         self.config = {
           "networkType": networkType,
           "longDistanceConnections": longDistanceConnections,
@@ -282,6 +282,7 @@ class L4L2Experiment(object):
           "L2Params": self.getBayesianL2Params(inputSize, numInputBits),
         }
         self.config["L4Params"]["maxSegmentsPerCell"] = maxSegmentsPerCell
+        self.config["L4Params"]["implementation"] = implementation
 
     if enableLateralSP:
       self.config["lateralSPParams"] = self.getDefaultLateralSPParams(inputSize)
