@@ -549,7 +549,7 @@ class BayesianColumnPooler(object):
     noisy_input_vector = (1 - self.noise) * cells
     # Consider only active segments
     noisy_input_vector[noisy_input_vector > 0] += self.noise
-    movingAverageBias[active_cells_indices, :] += learningRate * (
+    movingAverageBias[active_cells_indices] += learningRate * (
             noisy_input_vector[active_cells_indices] - movingAverageBias[active_cells_indices]
     )
 
@@ -558,8 +558,8 @@ class BayesianColumnPooler(object):
     noisy_input_vector = (1 - self.noise) * inputValues
     # Consider only active segments
     noisy_input_vector[noisy_input_vector > 0] += self.noise
-    movingAverageInput[input_mask, :] += learningRate * (
-            noisy_input_vector[input_mask, :] - movingAverageInput[input_mask, :]
+    movingAverageInput[input_mask] += learningRate * (
+            noisy_input_vector[input_mask] - movingAverageInput[input_mask]
     )
     return movingAverage, movingAverageBias, movingAverageInput
 
