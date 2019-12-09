@@ -268,7 +268,7 @@ class L4L2Experiment(object):
       }
 
     else:
-      if "Bayesian" is in implementation:
+      if "Bayesian" in implementation:
         self.config = {
           "networkType": networkType,
           "longDistanceConnections": longDistanceConnections,
