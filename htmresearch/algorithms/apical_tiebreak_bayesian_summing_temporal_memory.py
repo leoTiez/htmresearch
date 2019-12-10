@@ -123,33 +123,23 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     # Three dimensional to have weight from every input to every segment with mapping from segment to cell
     self.basalWeights = np.zeros(
       (self.numBasalSegments, self.columnCount*self.cellsPerColumn, self.basalInputSize))
-    # Initialise weights to first segment randomly
-    # TODO check whether this is necessary. Setting it zero should conceptually work. What is the outcome?
-    # self.basalWeights[0, :, :] = np.random.random(self.basalWeights[0, :, :].shape)
+
     self.apicalWeights = np.zeros(
       (self.numApicalSegments, self.columnCount*self.cellsPerColumn, self.apicalInputSize))
-    # Initialise weights to first segment randomly
-    # self.apicalWeights[0, :, :] = np.random.random(self.apicalWeights[0, :, :].shape)
     self.basalBias = np.zeros((self.numBasalSegments, self.columnCount*self.cellsPerColumn))
     self.apicalBias = np.zeros((self.numApicalSegments, self.columnCount*self.cellsPerColumn))
-
-    # Initialize moving averages with 1/(M_i*M_j), 1/(M_i) or 1/(M_j)
-    self.basalMovingAverages = np.full(
-      (self.numBasalSegments, self.columnCount*self.cellsPerColumn, self.basalInputSize),
-      1.0/(self.numberOfCells()*self.basalInputSize)
-    )
-    self.apicalMovingAverages = np.full(
-      (self.numApicalSegments, self.columnCount*self.cellsPerColumn, self.apicalInputSize),
-      1.0/(self.numberOfCells()*self.apicalInputSize)
-    )
-    self.basalMovingAveragesBias = np.full((self.numBasalSegments, self.numberOfCells()), 1.0)
-    self.apicalMovingAveragesBias = np.full((self.numApicalSegments, self.numberOfCells()), 1.0)
-    self.basalMovingAverageInput = np.full(self.basalInputSize, 1.0)
-    self.apicalMovingAverageInput = np.full(self.apicalInputSize, 1.0)
 
     # Set to zero to use randomly initialized first weight value
     self.basalSegmentCount = np.zeros((self.columnCount, self.cellsPerColumn))
     self.apicalSegmentCount = np.zeros((self.columnCount, self.cellsPerColumn))
+
+    self.basalConnectionCount = np.zeros((1, self.numberOfCells(), self.basalInputSize))
+    self.apicalConnectionCount = np.zeros((1, self.numberOfCells(), self.apicalInputSize))
+    self.basalSegmentActivationCount = np.zeros(self.numberOfCells())
+    self.apicalSegmentActivationCount = np.zeros(self.numberOfCells())
+    self.basalInputCount = np.zeros(self.basalInputSize)
+    self.apicalInputCount = np.zeros(self.apicalInputSize)
+    self.updateCounter = 0
 
     # Changed already to float64
     self.predictedCells = np.zeros(self.numberOfCells(), dtype="float64")
@@ -259,19 +249,25 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     # Calculate basal segment activity after bursting
     if bursting_columns.shape[0] > 0:
       if np.any(self.numBasalSegments == np.min(self.basalSegmentCount[activeColumns, :], axis=1)):
-        (self.basalWeights,
-         self.basalMovingAverages,
-         self.basalBias,
-         self.basalMovingAveragesBias,
-         self.activeBasalSegments,
-         self.numBasalSegments) = self._addNewSegments(isApical=False)
+         self._addNewSegments(
+           self.basalWeights,
+           self.basalConnectionCount,
+           self.basalBias,
+           self.basalSegmentActivationCount,
+           self.activeBasalSegments,
+           self.numBasalSegments,
+           self.maxSegmentsPerCell
+         )
       if np.any(self.numApicalSegments == np.min(self.apicalSegmentCount[activeColumns, :], axis=1)):
-        (self.apicalWeights,
-         self.apicalMovingAverages,
-         self.apicalBias,
-         self.apicalMovingAveragesBias,
-         self.activeApicalSegments,
-         self.numApicalSegments) = self._addNewSegments(isApical=True)
+        self._addNewSegments(
+          self.apicalWeights,
+          self.apicalConnectionCount,
+          self.apicalBias,
+          self.apicalSegmentActivationCount,
+          self.activeApicalSegments,
+          self.numApicalSegments,
+          self.maxSegmentsPerCell
+        )
 
       self.activeBasalSegments, self.basalSegmentCount = self._setMaxSegmentsAfterBursting(
         bursting_columns,
@@ -303,71 +299,71 @@ class ApicalTiebreakBayesianTemporalMemory(object):
       # Update moving averages
       # TODO updates moving averages of segments when they have sufficient activiation even if they have not been previously used -> Required?
       # moved to the if statement to prevent update while learning TODO implement temporal learning rate as parameter such that it can be passed from outside
-      self.basalMovingAverages, self.basalMovingAveragesBias, self.basalMovingAverageInput = self._updateMovingAverage(
+
+      self._updateCount(
         self.activeBasalSegments,
-        self.basalMovingAverages,
-        self.basalMovingAveragesBias,
-        self.basalMovingAverageInput,
+        self.basalConnectionCount,
+        self.basalSegmentActivationCount,
+        self.basalInputCount,
         self.basalInput,
-        self.basalInputSize,
-        temporalLearningRate,
         isApical=False
       )
-      self.apicalMovingAverages, self.apicalMovingAveragesBias, self.apicalMovingAverageInput = self._updateMovingAverage(
+      self._updateCount(
         self.activeApicalSegments,
-        self.apicalMovingAverages,
-        self.apicalMovingAveragesBias,
-        self.apicalMovingAverageInput,
+        self.apicalConnectionCount,
+        self.apicalSegmentActivationCount,
+        self.apicalInputCount,
         self.apicalInput,
-        self.apicalInputSize,
-        temporalLearningRate,
         isApical=True
       )
+      self.updateCounter += 1
 
       self.basalWeights, self.basalBias = self._learn(
-        self.basalMovingAverages,
-        self.basalMovingAveragesBias,
-        self.basalMovingAverageInput
+        self.basalConnectionCount,
+        self.basalSegmentActivationCount,
+        self.basalInputCount,
+        self.updateCounter
       )
       self.apicalWeights, self.apicalBias = self._learn(
-        self.apicalMovingAverages,
-        self.apicalMovingAveragesBias,
-        self.apicalMovingAverageInput
+        self.apicalConnectionCount,
+        self.apicalSegmentActivationCount,
+        self.apicalInputCount,
+        self.updateCounter
       )
 
   def _calculatePredictedValues(self, activation_basal, activation_apical):
     # TODO: We can not interpret it as probability anymore when adding apical+basal activation
     predicted_cells = self._calculatePredictedCells(activation_basal, activation_apical)
-    # TODO when apply threshold -> experiments
-    predicted_cells[predicted_cells < self.minThreshold] = 0.0
     # TODO: Update status report to normalize before activation
+    predicted_cells[predicted_cells < self.minThreshold] = 0.0
     normalisation = self._reshapeCellsToColumnBased(predicted_cells).sum(axis=0)
     predicted_cells = self._reshapeCellsFromColumnBased(
       self._reshapeCellsToColumnBased(predicted_cells)
       / normalisation.reshape((1, normalisation.shape[0]))
     )
     predicted_cells[np.isnan(predicted_cells)] = 0
+    # TODO when apply threshold -> experiments
     return predicted_cells
 
-  def _addNewSegments(self, isApical=False):
-    input_size = self.apicalInputSize if isApical else self.basalInputSize
-    weight_matrix = self.apicalWeights if isApical else self.basalWeights
-    average_matrix = self.apicalMovingAverages if isApical else self.basalMovingAverages
-    bias_matrix = self.apicalBias if isApical else self.basalBias
-    bias_average = self.apicalMovingAveragesBias if isApical else self.basalMovingAveragesBias
-    active_segments = self.activeApicalSegments if isApical else self.activeBasalSegments
-    numSegments = self.numApicalSegments if isApical else self.numBasalSegments
-
-    if numSegments + 1 < self.maxSegmentsPerCell:
-      # TODO Check whether random or zeros is better
-      weight_matrix = np.append(weight_matrix, np.random.random((1, self.numberOfCells(), input_size)), axis=0)
-      average_matrix = np.append(average_matrix, np.zeros((1, self.numberOfCells(), input_size)), axis=0)
-      bias_matrix = np.append(bias_matrix, np.zeros((1, self.numberOfCells())), axis=0)
-      bias_average = np.append(bias_average, np.zeros((1, self.numberOfCells())), axis=0)
-      active_segments = np.append(active_segments, np.zeros((1, self.numberOfCells())), axis=0)
+  @staticmethod
+  def _addNewSegments(
+          weights,
+          connectionCount,
+          bias,
+          segmentActivationCount,
+          activeSegments,
+          numSegments,
+          maxSegments
+  ):
+    numberOfCells = weights.shape[1]
+    inputSize = weights.shape[0]
+    if numSegments + 1 < maxSegments:
+      weights = np.append(weights, np.zeros((1, numberOfCells, inputSize)), axis=0)
+      connectionCount = np.append(connectionCount, np.zeros((1, numberOfCells, inputSize)), axis=0)
+      bias = np.append(bias, np.zeros((1, numberOfCells)), axis=0)
+      segmentActivationCount = np.append(segmentActivationCount, np.zeros((1, numberOfCells)), axis=0)
+      activeSegments = np.append(activeSegments, np.zeros((1, numberOfCells)), axis=0)
       numSegments += 1
-
-    return weight_matrix, average_matrix, bias_matrix, bias_average, active_segments, numSegments
 
   def _setMaxSegmentsAfterBursting(self, burstingColumns, segments, segmentCount, isApical=False):
     # Calculate bursting columns
@@ -436,45 +432,27 @@ class ApicalTiebreakBayesianTemporalMemory(object):
   def _reshapeCellsFromColumnBased(self, cells):
     return cells.reshape(-1)
 
-  def _updateMovingAverage(
+  def _updateCount(
           self,
           segments,
-          movingAverage,
-          movingAverageBias,
-          movingAverageInput,
+          connectionCount,
+          segmentActivityCount,
+          inputCount,
           inputValues,
-          inputSize,
-          learningRate,
           isApical=False
   ):
-    if learningRate is None:
-      learningRate = self.learningRate
-
     numSegments = self.numApicalSegments if isApical else self.numBasalSegments
     # Updating moving average weights to input
-    noisy_connection_matrix = np.outer((1 - self.noise**2) * segments, inputValues)
+    connection_matrix = np.outer(segments, inputValues)
     # Consider only active segments
-    noisy_connection_matrix[noisy_connection_matrix > 0] += self.noise**2
-    noisy_connection_matrix = noisy_connection_matrix.reshape(numSegments, self.numberOfCells(), inputSize)
-    movingAverage += learningRate * (
-            noisy_connection_matrix - movingAverage
-    )
+    connection_matrix = connection_matrix.reshape(numSegments, self.numberOfCells(), connectionCount.shape[-1])
+    connectionCount += connection_matrix
 
     # Updating moving average bias of each segment
-    noisy_activation_vector = (1 - self.noise) * segments
-    # Consider only active segments
-    noisy_activation_vector[noisy_activation_vector > 0] += self.noise
-    movingAverageBias += learningRate * (
-            noisy_activation_vector - movingAverageBias
-    )
+    segmentActivityCount += segments.reshape(-1)
+
     # Updating moving average input activity
-    noisy_input_vector = (1 - self.noise) * inputValues
-    # Consider only active segments
-    noisy_input_vector[noisy_input_vector > 0] += self.noise
-    movingAverageInput += learningRate * (
-            noisy_input_vector - movingAverageInput
-    )
-    return movingAverage, movingAverageBias, movingAverageInput
+    inputCount += inputValues.reshape(-1)
 
   @staticmethod
   def _calculateSegmentActivity(weights, activeInput, bias, noise, use_bias=True):
@@ -502,23 +480,22 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
     @return (numpy array)
     """
-    # add back again + activeApicalSegments
-    max_cells = (activeBasalSegments).max(axis=0)
+    max_cells = (activeBasalSegments + activeApicalSegments).max(axis=0)
 
     return max_cells
 
   @staticmethod
-  def _learn(movingAverages, movingAveragesBias, movingAveragesInput):
-    weights = movingAverages / np.outer(
-      movingAveragesBias,
-      movingAveragesInput
-    ).reshape(movingAverages.shape)
+  def _learn(connectionCount, activationCount, inputCount, updateCounter):
+    weights = connectionCount / np.outer(
+      activationCount,
+      inputCount
+    ).reshape(connectionCount.shape)
     # set division by zero to zero since this represents unused segments
     weights[np.isnan(weights)] = 0
 
     # Unused segments are set to -inf. That is desired since we take the exp function for the activation
     # exp(-inf) = 0 what is the desired outcome
-    bias = np.log(movingAveragesBias)
+    bias = np.log(activationCount / float(updateCounter))
     return weights, bias
 
   @classmethod
@@ -651,7 +628,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
 
 # TODO adapt class for the compute method which is used as a common interface
-class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemory):
+class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemory):
   """
   Pair memory with apical tiebreak.
   """

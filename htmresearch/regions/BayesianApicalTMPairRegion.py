@@ -337,7 +337,9 @@ class BayesianApicalTMPairRegion(PyRegion):
       if self.implementation == "BayesianApicalTiebreak":
         import htmresearch.algorithms.apical_tiebreak_bayesian_temporal_memory as btm
         cls = btm.BayesianApicalTiebreakPairMemory
-
+      elif self.implementation == "SummingBayesianApicalTiebreak":
+        import htmresearch.algorithms.apical_tiebreak_bayesian_summing_temporal_memory as btm
+        cls = btm.SummingBayesianApicalTiebreakPairMemory
       else:
         raise ValueError("Unrecognized implementation %s" % self.implementation)
 

@@ -255,7 +255,7 @@ def runExperiment():
   numFeatures = 3 # new: 3 # original: 3
   numPoints = 5 # new: 5 # original: 10
   numLocations = 5 # new: 5 # original: 10
-  numObjects = 2 # new: 2 # original: 10
+  numObjects = 4 # new: 2 # original: 10
   numRptsPerSensation = 2
 
   objectMachine = createObjectMachine(
@@ -281,17 +281,17 @@ def runExperiment():
     objectsSingleColumn[i] = featureLocations
 
   # params
-  maxNumSegments = 2
+  maxNumSegments = 4
   L2Overrides = {
-    "learningRate": 0.1, 
-    "noise": 0.01,
-    "cellCount": 256, # new: 256 # original: 4096
+    "learningRate": 0.01,
+    "noise": 1e-8,
+    "cellCount": 512, # new: 256 # original: 4096
     "inputWidth": 8192, # new: 8192 # original: 16384 (?)
   }
 
   L4Overrides = {
-    "learningRate": 0.1,
-    "noise": 0.01,
+    "learningRate": 0.001,
+    "noise": 1e-8,
     "cellsPerColumn": 4, # new: 4 # original 32
     "columnCount": 2048, # new: 2048 # original: 2048
     "minThreshold": 0.35,
@@ -306,7 +306,7 @@ def runExperiment():
     L4Overrides=L4Overrides,
     numCorticalColumns=1,
     maxSegmentsPerCell=maxNumSegments,
-    numLearningPoints=3,
+    numLearningPoints=15,
     seed=1
   )
 
