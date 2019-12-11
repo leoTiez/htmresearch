@@ -255,7 +255,7 @@ def runExperiment():
   numFeatures = 3 # new: 3 # original: 3
   numPoints = 5 # new: 5 # original: 10
   numLocations = 5 # new: 5 # original: 10
-  numObjects = 4 # new: 2 # original: 10
+  numObjects = 3 # new: 2 # original: 1
   numRptsPerSensation = 2
 
   objectMachine = createObjectMachine(
@@ -287,6 +287,7 @@ def runExperiment():
     "noise": 1e-8,
     "cellCount": 512, # new: 256 # original: 4096
     "inputWidth": 8192, # new: 8192 # original: 16384 (?)
+    "activationThreshold": 0.01
   }
 
   L4Overrides = {

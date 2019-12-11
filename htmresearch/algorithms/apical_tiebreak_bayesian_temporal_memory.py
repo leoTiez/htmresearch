@@ -133,19 +133,19 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     self.basalBias = np.zeros((self.numBasalSegments, self.columnCount*self.cellsPerColumn))
     self.apicalBias = np.zeros((self.numApicalSegments, self.columnCount*self.cellsPerColumn))
 
-    # Initialize moving averages with 1/(M_i*M_j), 1/(M_i) or 1/(M_j)
+    # Initialize moving averages uniformly with 1/(M_i*M_j), 1/(M_i) or 1/(M_j)
     self.basalMovingAverages = np.full(
-      (self.numBasalSegments, self.columnCount*self.cellsPerColumn, self.basalInputSize),
-      1.0/(self.numberOfCells()*self.basalInputSize)
+      (self.numBasalSegments, self.numberOfCells(), self.basalInputSize),
+      0.0
     )
     self.apicalMovingAverages = np.full(
-      (self.numApicalSegments, self.columnCount*self.cellsPerColumn, self.apicalInputSize),
-      1.0/(self.numberOfCells()*self.apicalInputSize)
+      (self.numApicalSegments, self.numberOfCells(), self.apicalInputSize),
+      0.0
     )
-    self.basalMovingAveragesBias = np.full((self.numBasalSegments, self.numberOfCells()), 1.0)
-    self.apicalMovingAveragesBias = np.full((self.numApicalSegments, self.numberOfCells()), 1.0)
-    self.basalMovingAverageInput = np.full(self.basalInputSize, 1.0)
-    self.apicalMovingAverageInput = np.full(self.apicalInputSize, 1.0)
+    self.basalMovingAveragesBias = np.full((self.numBasalSegments, self.numberOfCells()), 0.0)
+    self.apicalMovingAveragesBias = np.full((self.numApicalSegments, self.numberOfCells()), 0.0)
+    self.basalMovingAverageInput = np.full(self.basalInputSize, 0.0)
+    self.apicalMovingAverageInput = np.full(self.apicalInputSize, 0.0)
 
     # Set to zero to use randomly initialized first weight value
     self.basalSegmentCount = np.zeros((self.columnCount, self.cellsPerColumn))
@@ -359,8 +359,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     numSegments = self.numApicalSegments if isApical else self.numBasalSegments
 
     if numSegments + 1 < self.maxSegmentsPerCell:
-      # TODO Check whether random or zeros is better
-      weight_matrix = np.append(weight_matrix, np.random.random((1, self.numberOfCells(), input_size)), axis=0)
+      weight_matrix = np.append(weight_matrix, np.zeros((1, self.numberOfCells(), input_size)), axis=0)
       average_matrix = np.append(average_matrix, np.zeros((1, self.numberOfCells(), input_size)), axis=0)
       bias_matrix = np.append(bias_matrix, np.zeros((1, self.numberOfCells())), axis=0)
       bias_average = np.append(bias_average, np.zeros((1, self.numberOfCells())), axis=0)
@@ -451,8 +450,23 @@ class ApicalTiebreakBayesianTemporalMemory(object):
       learningRate = self.learningRate
 
     numSegments = self.numApicalSegments if isApical else self.numBasalSegments
+
+    # Updating moving average input activity
+    noisy_input_vector = (1 - self.noise) * inputValues
+    # Consider only active segments
+    noisy_input_vector[noisy_input_vector > 0] += self.noise
+    movingAverageInput += learningRate * (
+            noisy_input_vector - movingAverageInput
+    )
+
+    # First update input values (includes learning rate)
+    # Then use the probabilities of activity for movingAverage calculation
+    # Instead of using 1 -> would lead to weight explosion, because we calculate weights based on MovingAverageInput
+    inputProbabilities = inputValues
+    inputProbabilities[inputValues.nonzero()] = movingAverageInput[inputValues.nonzero()]
+
     # Updating moving average weights to input
-    noisy_connection_matrix = np.outer((1 - self.noise**2) * segments, inputValues)
+    noisy_connection_matrix = np.outer((1 - self.noise**2) * segments, inputProbabilities)
     # Consider only active segments
     noisy_connection_matrix[noisy_connection_matrix > 0] += self.noise**2
     noisy_connection_matrix = noisy_connection_matrix.reshape(numSegments, self.numberOfCells(), inputSize)
@@ -467,13 +481,7 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     movingAverageBias += learningRate * (
             noisy_activation_vector - movingAverageBias
     )
-    # Updating moving average input activity
-    noisy_input_vector = (1 - self.noise) * inputValues
-    # Consider only active segments
-    noisy_input_vector[noisy_input_vector > 0] += self.noise
-    movingAverageInput += learningRate * (
-            noisy_input_vector - movingAverageInput
-    )
+
     return movingAverage, movingAverageBias, movingAverageInput
 
   @staticmethod
@@ -515,6 +523,12 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     ).reshape(movingAverages.shape)
     # set division by zero to zero since this represents unused segments
     weights[np.isnan(weights)] = 0
+
+    # Quote Sandberg: "A further minor complication relates to units that have never participated in any shown pattern.
+    # Such units will have a disruptive effect on the network due to extreme valued connections and biases. [..]
+    # By explicitly setting their connections w_ij = 1 their influence can be removed.
+    # ==> Against weight explosion
+    weights[weights > 1.0] = 1.0
 
     # Unused segments are set to -inf. That is desired since we take the exp function for the activation
     # exp(-inf) = 0 what is the desired outcome

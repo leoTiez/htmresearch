@@ -30,6 +30,7 @@ pip-log.txt
 nosetests.xml
 htmlcov
 junit-test-results.xml
+./tests/bayesian/plots
 
 # Translations
 *.mo
