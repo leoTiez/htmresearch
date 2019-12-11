@@ -28,7 +28,7 @@ class BayesianTMTest(unittest.TestCase):
 
         self.exp1 = L4L2Experiment(
             'single_column',
-            implementation='BayesianApicalTiebreak',
+            implementation='SummingBayesianApicalTiebreak',
             L2RegionType="py.BayesianColumnPoolerRegion",
             L4RegionType="py.BayesianApicalTMPairRegion",
             L2Overrides=L2Overrides,

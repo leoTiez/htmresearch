@@ -326,7 +326,8 @@ class BayesianColumnPooler(object):
 
     # Finally, now that we have decided which cells we should be learning on, do
     # the actual learning.
-    if len(feedforwardInput) > 0:
+    if len(feedforwardInput) > 0: # Length of feed-forward input should always be equal to self.inputWidth
+                                  # Thus this is a tautology
       self.proximalWeights, \
       self.proximalBias = self._learn(self.proximalMovingAverages, self.proximalMovingAverageBias, self.proximalMovingAverageInput)
 
@@ -337,7 +338,11 @@ class BayesianColumnPooler(object):
 
       # Internal distal learning
       self.internalDistalWeights, \
-      self.internalDistalBias = self._learn(self.internalDistalMovingAverages, self.internalDistalMovingAverageBias, self.internalDistalMovingAverageInput)
+      self.internalDistalBias = self._learn(
+        self.internalDistalMovingAverages,
+        self.internalDistalMovingAverageBias,
+        self.internalDistalMovingAverageBias  # Having recurrent connections, thus weights between each other are learnt
+      )
 
 
   def _computeInferenceMode(self, feedforwardInput, lateralInputs):
@@ -526,29 +531,35 @@ class BayesianColumnPooler(object):
     if learningRate is None:
       learningRate = self.learningRate
 
+    # Update only values for the active cells indices. Since we have a sparse representation it is likely that every
+    # neuron is only active for one particular pattern or few ones. Hence, the more update steps are taken the less the
+    # neuron becomes activated and thus the weights are more decreased. This leads to a forgetting mechanism that is
+    # not desired in a sparse representation
+    active_cells_indices = self.getActiveCellsIndices()
     # Updating moving average weights to input
     noisy_connection_matrix = np.outer((1 - self.noise**2) * cells, inputValues)
     # Consider only active segments
     noisy_connection_matrix[noisy_connection_matrix > 0] += self.noise**2
     noisy_connection_matrix = noisy_connection_matrix.reshape(self.cellCount, inputSize)
-    movingAverage += learningRate * (
-            noisy_connection_matrix - movingAverage
+    movingAverage[active_cells_indices, :] += learningRate * (
+            noisy_connection_matrix[active_cells_indices, :] - movingAverage[active_cells_indices, :]
     )
 
     # Updating moving average bias activity
     noisy_input_vector = (1 - self.noise) * cells
     # Consider only active segments
     noisy_input_vector[noisy_input_vector > 0] += self.noise
-    movingAverageBias += learningRate * (
-            noisy_input_vector - movingAverageBias
+    movingAverageBias[active_cells_indices] += learningRate * (
+            noisy_input_vector[active_cells_indices] - movingAverageBias[active_cells_indices]
     )
 
     # Updating moving average input activity
+    input_mask = inputValues > 0
     noisy_input_vector = (1 - self.noise) * inputValues
     # Consider only active segments
     noisy_input_vector[noisy_input_vector > 0] += self.noise
-    movingAverageInput += learningRate * (
-            noisy_input_vector - movingAverageInput
+    movingAverageInput[input_mask] += learningRate * (
+            noisy_input_vector[input_mask] - movingAverageInput[input_mask]
     )
     return movingAverage, movingAverageBias, movingAverageInput
 
