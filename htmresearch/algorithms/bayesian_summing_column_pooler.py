@@ -378,90 +378,105 @@ class BayesianSummingColumnPooler(object):
     feedForwardActivation = self._activation(self.proximalWeights, feedforwardInput, self.proximalBias, self.noise)
 
     # Internal Distal
-    internalDistalActivation = self._activation(self.internalDistalWeights, prevActiveCells, self.internalDistalBias, self.noise)
+    # internalDistalActivation = self._activation(self.internalDistalWeights, prevActiveCells, self.internalDistalBias, self.noise)
 
     # # Lateral connections to other cortical columns
     # for i, lateralInput in enumerate(lateralInputs):
     #   distalActivation = self._activation(self.distalWeights[i], lateralInput, self.distalBias[i], self.noise)
 
-    
-    chosenCells = np.array([], dtype="int")
+    supportedFeedForward = self._supportedActivation(feedForwardActivation)
+    zippedFFActivationThreshold = zip(
+      range(len(supportedFeedForward[supportedFeedForward >= self.activationThreshold])),
+      supportedFeedForward[supportedFeedForward >= self.activationThreshold])
+    zippedFFActivationThreshold.sort(key=lambda t: t[1])
+    zippedFFActivationThreshold.reverse()
+    zippedFFActivation = zip(range(len(supportedFeedForward)), supportedFeedForward)
+    zippedFFActivation.sort(key=lambda t: t[1])
+    zippedFFActivation.reverse()
+    ffActivationTopN = zippedFFActivationThreshold if len(
+      zippedFFActivationThreshold) >= self.sdrSize else zippedFFActivation[:self.sdrSize]
+    indices, activation = zip(*ffActivationTopN)
 
-    # First, activate the FF-supported cells that have the highest number of
-    # lateral active segments (as long as it's not 0)
-    if len(feedforwardSupportedCells) == 0:
-      pass
-    else:
-      numActiveSegsForFFSuppCells = numActiveSegmentsByCell[feedforwardSupportedCells]
-
-      # This loop will select the FF-supported AND laterally-active cells, in
-      # order of descending lateral activation, until we exceed the sdrSize
-      # quorum - but will exclude cells with 0 lateral active segments.
-      ttop = np.max(numActiveSegsForFFSuppCells)
-      while ttop > 0 and len(chosenCells) < self.sdrSize:
-        supported = feedforwardSupportedCells[numActiveSegsForFFSuppCells >= ttop]
-        chosenCells = np.union1d(chosenCells, supported)
-        ttop -= 1
-
-    # If we haven't filled the sdrSize quorum, add in inertial cells.
-    if len(chosenCells) < self.sdrSize:
-      if self.useInertia:
-        prevCells = np.setdiff1d(prevActiveCellIndices, chosenCells)
-        inertialCap = int(len(prevCells) * self.inertiaFactor)
-        if inertialCap > 0:
-          numActiveSegsForPrevCells = numActiveSegmentsByCell[prevCells]
-          # We sort the previously-active cells by number of active lateral
-          # segments (this really helps).  We then activate them in order of
-          # descending lateral activation.
-          sortIndices = np.argsort(numActiveSegsForPrevCells)[::-1]
-          prevCells = prevCells[sortIndices]
-          numActiveSegsForPrevCells = numActiveSegsForPrevCells[sortIndices]
-
-          # We use inertiaFactor to limit the number of previously-active cells
-          # which can become active, forcing decay even if we are below quota.
-          prevCells = prevCells[:inertialCap]
-          numActiveSegsForPrevCells = numActiveSegsForPrevCells[:inertialCap]
-
-          # Activate groups of previously active cells by order of their lateral
-          # support until we either meet quota or run out of cells.
-          ttop = np.max(numActiveSegsForPrevCells)
-          while ttop >= 0 and len(chosenCells) < self.sdrSize:
-            chosenCells = np.union1d(chosenCells, prevCells[numActiveSegsForPrevCells >= ttop])
-            ttop -= 1
-
-    # If we haven't filled the sdrSize quorum, add cells that have feedforward
-    # support and no lateral support.
-    discrepancy = self.sdrSize - len(chosenCells)
-    if discrepancy > 0:
-      remFFcells = np.setdiff1d(feedforwardSupportedCells, chosenCells)
-
-      # Inhibit cells proportionally to the number of cells that have already
-      # been chosen. If ~0 have been chosen activate ~all of the feedforward
-      # supported cells. If ~sdrSize have been chosen, activate very few of
-      # the feedforward supported cells.
-
-      # Use the discrepancy:sdrSize ratio to determine the number of cells to
-      # activate.
-      n = (len(remFFcells) * discrepancy) // self.sdrSize
-      # Activate at least 'discrepancy' cells.
-      n = max(n, discrepancy)
-      # If there aren't 'n' available, activate all of the available cells.
-      n = min(n, len(remFFcells))
-
-      if len(remFFcells) > n:
-        selected = _sample(self._random, remFFcells, n)
-        chosenCells = np.append(chosenCells, selected)
-      else:
-        chosenCells = np.append(chosenCells, remFFcells)
-
-    chosenCells.sort()
-    self.activeCells = np.zeros(self.cellCount, dtype="float64")
-    # TODO: Inference mode only sets them to 1, but we could calculate a value from the proximal/distal support
-    self.activeCells[chosenCells] = 1 # feedForwardActivation[chosenCells] + distal/lateral mult/sum?
+    self.activeCells[indices] = activation
+    # TODO check normalisation -> competition necessary?
+    self.activeCells /= self.activeCells.sum()
+    # chosenCells = np.array([], dtype="int")
+    #
+    # # First, activate the FF-supported cells that have the highest number of
+    # # lateral active segments (as long as it's not 0)
+    # if len(feedforwardSupportedCells) == 0:
+    #   pass
+    # else:
+    #   numActiveSegsForFFSuppCells = numActiveSegmentsByCell[feedforwardSupportedCells]
+    #
+    #   # This loop will select the FF-supported AND laterally-active cells, in
+    #   # order of descending lateral activation, until we exceed the sdrSize
+    #   # quorum - but will exclude cells with 0 lateral active segments.
+    #   ttop = np.max(numActiveSegsForFFSuppCells)
+    #   while ttop > 0 and len(chosenCells) < self.sdrSize:
+    #     supported = feedforwardSupportedCells[numActiveSegsForFFSuppCells >= ttop]
+    #     chosenCells = np.union1d(chosenCells, supported)
+    #     ttop -= 1
+    #
+    # # If we haven't filled the sdrSize quorum, add in inertial cells.
+    # if len(chosenCells) < self.sdrSize:
+    #   if self.useInertia:
+    #     prevCells = np.setdiff1d(prevActiveCellIndices, chosenCells)
+    #     inertialCap = int(len(prevCells) * self.inertiaFactor)
+    #     if inertialCap > 0:
+    #       numActiveSegsForPrevCells = numActiveSegmentsByCell[prevCells]
+    #       # We sort the previously-active cells by number of active lateral
+    #       # segments (this really helps).  We then activate them in order of
+    #       # descending lateral activation.
+    #       sortIndices = np.argsort(numActiveSegsForPrevCells)[::-1]
+    #       prevCells = prevCells[sortIndices]
+    #       numActiveSegsForPrevCells = numActiveSegsForPrevCells[sortIndices]
+    #
+    #       # We use inertiaFactor to limit the number of previously-active cells
+    #       # which can become active, forcing decay even if we are below quota.
+    #       prevCells = prevCells[:inertialCap]
+    #       numActiveSegsForPrevCells = numActiveSegsForPrevCells[:inertialCap]
+    #
+    #       # Activate groups of previously active cells by order of their lateral
+    #       # support until we either meet quota or run out of cells.
+    #       ttop = np.max(numActiveSegsForPrevCells)
+    #       while ttop >= 0 and len(chosenCells) < self.sdrSize:
+    #         chosenCells = np.union1d(chosenCells, prevCells[numActiveSegsForPrevCells >= ttop])
+    #         ttop -= 1
+    #
+    # # If we haven't filled the sdrSize quorum, add cells that have feedforward
+    # # support and no lateral support.
+    # discrepancy = self.sdrSize - len(chosenCells)
+    # if discrepancy > 0:
+    #   remFFcells = np.setdiff1d(feedforwardSupportedCells, chosenCells)
+    #
+    #   # Inhibit cells proportionally to the number of cells that have already
+    #   # been chosen. If ~0 have been chosen activate ~all of the feedforward
+    #   # supported cells. If ~sdrSize have been chosen, activate very few of
+    #   # the feedforward supported cells.
+    #
+    #   # Use the discrepancy:sdrSize ratio to determine the number of cells to
+    #   # activate.
+    #   n = (len(remFFcells) * discrepancy) // self.sdrSize
+    #   # Activate at least 'discrepancy' cells.
+    #   n = max(n, discrepancy)
+    #   # If there aren't 'n' available, activate all of the available cells.
+    #   n = min(n, len(remFFcells))
+    #
+    #   if len(remFFcells) > n:
+    #     selected = _sample(self._random, remFFcells, n)
+    #     chosenCells = np.append(chosenCells, selected)
+    #   else:
+    #     chosenCells = np.append(chosenCells, remFFcells)
+    #
+    # chosenCells.sort()
+    # self.activeCells = np.zeros(self.cellCount, dtype="float64")
+    # # TODO: Inference mode only sets them to 1, but we could calculate a value from the proximal/distal support
+    # self.activeCells[chosenCells] = 1 # feedForwardActivation[chosenCells] + distal/lateral mult/sum?
 
     print "Column pooler inference input/distalSupport/output"
     print feedforwardInput.nonzero()
-    print numActiveSegmentsByCell[numActiveSegmentsByCell > 0]
+    # print numActiveSegmentsByCell[numActiveSegmentsByCell > 0]
     print self.activeCells.nonzero()
 
   def numberOfInputs(self):
@@ -520,6 +535,10 @@ class BayesianSummingColumnPooler(object):
     """
     self.useInertia = useInertia
 
+  def _supportedActivation(self, feedForwardActivation):
+    supportedActivation = np.dot(self.internalDistalWeights, feedForwardActivation)
+    supportedActivation /= self.internalDistalBias
+    return supportedActivation
 
   def _updateCount(
           self,
