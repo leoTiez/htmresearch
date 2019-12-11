@@ -376,20 +376,15 @@ class BayesianSummingColumnPooler(object):
 
     # Calculate the feedforward supported cells
     feedForwardActivation = self._activation(self.proximalWeights, feedforwardInput, self.proximalBias, self.noise)
-    feedforwardSupportedCells = np.where(feedForwardActivation >= self.activationThreshold)[0]
-
-    # Calculate the number of active distal segments (internal and lateral) on each cell
-    numActiveSegmentsByCell = np.zeros(self.cellCount, dtype="int")
 
     # Internal Distal
     internalDistalActivation = self._activation(self.internalDistalWeights, prevActiveCells, self.internalDistalBias, self.noise)
-    numActiveSegmentsByCell[internalDistalActivation >= self.activationThreshold] += 1
 
-    # Lateral connections to other cortical columns
-    for i, lateralInput in enumerate(lateralInputs):
-      distalActivation = self._activation(self.distalWeights[i], lateralInput, self.distalBias[i], self.noise)
-      numActiveSegmentsByCell[distalActivation >= self.activationThreshold] += 1
+    # # Lateral connections to other cortical columns
+    # for i, lateralInput in enumerate(lateralInputs):
+    #   distalActivation = self._activation(self.distalWeights[i], lateralInput, self.distalBias[i], self.noise)
 
+    
     chosenCells = np.array([], dtype="int")
 
     # First, activate the FF-supported cells that have the highest number of
