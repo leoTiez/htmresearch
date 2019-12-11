@@ -13,7 +13,7 @@ class BayesianCPTest(unittest.TestCase):
         maxNumSegments = 2
         L2Overrides = {
             "learningRate": 0.1,
-            "noise": 0.0001,
+            "noise": 1e-8,
             "cellCount": 256,  # new: 256 # original: 4096
             "inputWidth": 8192,  # new: 8192 # original: 16384 (?)
             "sdrSize": 5,
@@ -22,7 +22,7 @@ class BayesianCPTest(unittest.TestCase):
 
         L4Overrides = {
             "learningRate": 0.1,
-            "noise": 0.01,
+            "noise": 1e-8,
             "cellsPerColumn": 4,  # new: 4 # original 32
             "columnCount": 2048,  # new: 2048 # original: 2048
             "minThreshold": 0.35,
