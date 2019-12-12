@@ -255,7 +255,7 @@ def runExperiment():
   numFeatures = 3 # new: 3 # original: 3
   numPoints = 5 # new: 5 # original: 10
   numLocations = 5 # new: 5 # original: 10
-  numObjects = 3 # new: 2 # original: 1
+  numObjects = 4 # new: 2 # original: 10
   numRptsPerSensation = 2
 
   objectMachine = createObjectMachine(
@@ -281,13 +281,14 @@ def runExperiment():
     objectsSingleColumn[i] = featureLocations
 
   # params
-  maxNumSegments = 4
+  maxNumSegments = 10
   L2Overrides = {
     "learningRate": 0.01,
     "noise": 1e-8,
-    "cellCount": 512, # new: 256 # original: 4096
+    "cellCount": 1024, # new: 256 # original: 4096
     "inputWidth": 8192, # new: 8192 # original: 16384 (?)
-    "activationThreshold": 0.01
+    "activationThreshold": 0.01,
+    "sdrSize": 40,
   }
 
   L4Overrides = {
@@ -300,14 +301,14 @@ def runExperiment():
 
   exp1 = L4L2Experiment(
     'single_column',
-    implementation='BayesianApicalTiebreak',
+    implementation='SummingBayesian',
     L2RegionType="py.BayesianColumnPoolerRegion",
     L4RegionType="py.BayesianApicalTMPairRegion",
     L2Overrides=L2Overrides,
     L4Overrides=L4Overrides,
     numCorticalColumns=1,
     maxSegmentsPerCell=maxNumSegments,
-    numLearningPoints=15,
+    numLearningPoints=3,
     seed=1
   )
 
@@ -325,7 +326,7 @@ def runExperiment():
   random.seed(12)
   for c in range(numColumns):
     objectCopy = [pair for pair in obj]
-    random.shuffle(objectCopy)
+    # random.shuffle(objectCopy)
     # stay multiple steps on each sensation
     sensations = []
     for pair in objectCopy:
@@ -349,8 +350,8 @@ def runExperiment():
   L2ActiveCellNVsTimeSingleColumn = []
   for sensation in sensationStepsSingleColumn:
     exp1.infer([sensation], objectName=objectId, reset=False)
-    l2ActiveCellsSingleColumn.append(exp1.getL2Representations())
-    L2ActiveCellNVsTimeSingleColumn.append(len(exp1.getL2Representations()[0]))
+    l2ActiveCellsSingleColumn.append(exp1.getL2Prediction())
+    L2ActiveCellNVsTimeSingleColumn.append(len(exp1.getL2Prediction()[0]))
 
   # Used to figure out where to put the red rectangle!
   sdrSize = exp1.config["L2Params"]["sdrSize"]
