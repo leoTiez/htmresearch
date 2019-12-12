@@ -257,8 +257,8 @@ class BayesianApicalTMPairRegion(PyRegion):
           "accessMode": "Read",
           "dataType": "Byte",
           "count": 0,
-          "constraints": "enum: BayesianApicalTiebreak",
-          "defaultValue": "BayesianApicalTiebreak"
+          "constraints": "enum: Bayesian, SummingBayesian",
+          "defaultValue": "Bayesian"
         },
       },
     }
@@ -334,10 +334,10 @@ class BayesianApicalTMPairRegion(PyRegion):
         "learningRate": self.learningRate,
       }
 
-      if self.implementation == "BayesianApicalTiebreak":
+      if self.implementation == "Bayesian":
         import htmresearch.algorithms.apical_tiebreak_bayesian_temporal_memory as btm
         cls = btm.BayesianApicalTiebreakPairMemory
-      elif self.implementation == "SummingBayesianApicalTiebreak":
+      elif self.implementation == "SummingBayesian":
         import htmresearch.algorithms.apical_tiebreak_bayesian_summing_temporal_memory as btm
         cls = btm.SummingBayesianApicalTiebreakPairMemory
       else:
