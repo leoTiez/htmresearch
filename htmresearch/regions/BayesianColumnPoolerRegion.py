@@ -24,7 +24,6 @@ import numpy as np
 import inspect
 
 from nupic.bindings.regions.PyRegion import PyRegion
-from htmresearch.algorithms.bayesian_column_pooler import BayesianColumnPooler
 
 
 def getConstructorArguments():
@@ -317,6 +316,50 @@ class BayesianColumnPoolerRegion(PyRegion):
           count=1,
           constraints=""),
 
+        forgetting=dict(
+          description="Forgetting for non activated values",
+          accessMode="Read",
+          dataType="Real32",
+          defaultValue=0.1,
+          count=1
+        ),
+        useSupport=dict(
+          description="Flag whether or not to use support",
+          accessMode="Read",
+          dataType="Bool",
+          defaultValue=False,
+          count=1
+        ),
+        avoidWeightExplosion=dict(
+          description="Flag whether or not to suppress weight explosion",
+          accessMode="Read",
+          dataType="Bool",
+          defaultValue=True,
+          count=1
+        ),
+        resetProximalCounter=dict(
+          description="Flag whether or not to reset proximal counter when learning new object",
+          accessMode="Read",
+          dataType="Bool",
+          defaultValue=False,
+          count=1
+        ),
+        useProximalProbabilities=dict(
+          description="Flag whether or not to use proximal ff activities as activation value",
+          accessMode="Read",
+          dataType="Bool",
+          defaultValue=True,
+          count=1
+        ),
+        implementation = dict(
+          description="Bayesian implementation",
+          accessMode="Read",
+          dataType="Byte",
+          count= 0,
+          constraints="enum: Bayesian, SummingBayesian",
+          defaultValue="Bayesian"
+        ),
+
         seed=dict(
           description="Seed for the random number generator.",
           accessMode="Read",
@@ -358,7 +401,12 @@ class BayesianColumnPoolerRegion(PyRegion):
                noise=0.01,  # lambda
                learningRate=0.1,  # alpha
                activationThreshold=0.5,  # probability such that a cell becomes active
-
+               forgetting=0.1,
+               useSupport=False,
+               avoidWeightExplosion=True,
+               resetProximalCounter=False,
+               useProximalProbabilities=True,
+               implementation="Bayesian",
                seed=42,
                defaultOutputType = "active",
                **kwargs):
@@ -381,6 +429,13 @@ class BayesianColumnPoolerRegion(PyRegion):
     self.learningRate = learningRate
     self.noise = noise
 
+    self.implementation = implementation
+
+    self.forgetting = forgetting
+    self.useSupport = useSupport
+    self.avoidWeightExplosion = avoidWeightExplosion
+    self.resetProximalCounter = resetProximalCounter
+    self.useProximalProbabilities = useProximalProbabilities
     # Region params
     self.learningMode = True
     self.defaultOutputType = defaultOutputType
@@ -406,12 +461,27 @@ class BayesianColumnPoolerRegion(PyRegion):
         "sampleSizeDistal": self.sampleSizeDistal,
         "inertiaFactor": self.inertiaFactor,
         "noise": self.noise,
-        "learningRate": self.learningRate,
         "activationThreshold": self.activationThreshold,
         "seed": self.seed,
       }
-      self._pooler = BayesianColumnPooler(**params)
 
+      if self.implementation == "Bayesian":
+        from htmresearch.algorithms.bayesian_column_pooler import BayesianColumnPooler as cls
+        params["learningRate"] = self.learningRate
+
+      elif self.implementation == "SummingBayesian":
+        from htmresearch.algorithms.bayesian_summing_column_pooler import BayesianSummingColumnPooler as cls
+
+        params["forgetting"] = self.forgetting
+        params["useSupport"] = self.useSupport
+        params["avoidWeightExplosion"] = self.avoidWeightExplosion
+        params["resetProximalCounter"] = self.resetProximalCounter
+        params["useProximalProbabilities"] = self.useProximalProbabilities
+
+      else:
+        raise ValueError("Unrecognized implementation %s" % self.implementation)
+
+      self._pooler = cls(**params)
 
   def compute(self, inputs, outputs):
     """
@@ -454,7 +524,7 @@ class BayesianColumnPoolerRegion(PyRegion):
     # Send the inputs into the Column Pooler.
     self._pooler.compute(feedforwardInput, lateralInputs,
                          feedforwardGrowthCandidates, learn=self.learningMode,
-                         predictedInput = predictedInput)
+                         predictedInput=predictedInput)
 
     # Extract the active / predicted cells and put them into value arrays.
     outputs["activeCells"][:] = self._pooler.getActiveCellValues()
