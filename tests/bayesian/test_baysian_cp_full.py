@@ -30,7 +30,7 @@ class BayesianCPTest(unittest.TestCase):
 
         self.exp1 = L4L2Experiment(
             'single_column',
-            implementation='BayesianApicalTiebreak',
+            implementation='SummingBayesian',
             L2RegionType="py.BayesianColumnPoolerRegion",
             L4RegionType="py.BayesianApicalTMPairRegion",
             L2Overrides=L2Overrides,
@@ -97,8 +97,13 @@ class BayesianCPTest(unittest.TestCase):
                                     active))
 
         active = self.exp1.getL2Representations()[0]
+        objectPrediction = self.exp1.getL2Prediction()[0]
+        self.assertTrue(np.array_equal(objectPrediction, simpleObjectRepresentation),
+                        '%s additional active cells were made, did not converge' % (len(objectPrediction) - len(simpleObjectRepresentation)))
+        # With a single object even the activation should be a sufficient indicator for activation
         self.assertTrue(np.array_equal(active, simpleObjectRepresentation),
-                        '%s additional active cells were made, did not converge' % (len(active) - len(simpleObjectRepresentation)))
+                        '%s additional active cells were made, did not converge' % (
+                                    len(active) - len(simpleObjectRepresentation)))
 
     def test_two_unique_toys_l2(self):
         # 4 sensations in a sequence fixed
@@ -139,6 +144,7 @@ class BayesianCPTest(unittest.TestCase):
                 self.exp1.infer([sensation], objectName=o, reset=False)
 
                 active = self.exp1.getL2Representations()[0]
+                objectPrediction = self.exp1.getL2Prediction()[0]
                 overlap = simpleObjectRepresentation.intersection(active)
                 overlap2 = simpleObjectRepresentation2.intersection(active)
 
@@ -153,9 +159,10 @@ class BayesianCPTest(unittest.TestCase):
 
                 # Check if last sensation converged
                 if (i == len(sensationStepsSingleColumn) - 1):
-                    self.assertTrue(np.array_equal(active, objectRepresentation),
+                    print "Final object prediction: %s" % objectPrediction
+                    self.assertTrue(np.array_equal(objectPrediction, objectRepresentation),
                                     '%s additional active cells were made, did not converge' % (
-                                                len(active) - len(objectRepresentation)))
+                                                len(objectPrediction) - len(objectRepresentation)))
 
             # reset after object to avoid temporal sequence
             self.exp1.sendReset()
@@ -200,6 +207,7 @@ class BayesianCPTest(unittest.TestCase):
                 self.exp1.infer([sensation], objectName=o, reset=False)
 
                 active = self.exp1.getL2Representations()[0]
+                objectPrediction = self.exp1.getL2Prediction()[0]
                 overlap = simpleObjectRepresentation.intersection(active)
                 overlap2 = simpleObjectRepresentation2.intersection(active)
 
@@ -221,8 +229,9 @@ class BayesianCPTest(unittest.TestCase):
 
                 # Check if last sensation converged
                 if (i == len(sensationStepsSingleColumn)-1):
-                    self.assertTrue(np.array_equal(active, objectRepresentation),
-                                    '%s additional active cells were made, did not converge' % (len(active) - len(objectRepresentation)))
+                    print "Final object prediction: %s" % objectPrediction
+                    self.assertTrue(np.array_equal(objectPrediction, objectRepresentation),
+                                    '%s additional active cells were made, did not converge' % (len(objectPrediction) - len(objectRepresentation)))
 
             # reset after object to avoid temporal sequence
             self.exp1.sendReset()
