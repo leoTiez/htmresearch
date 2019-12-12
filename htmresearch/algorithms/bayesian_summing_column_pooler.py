@@ -20,10 +20,10 @@
 # ----------------------------------------------------------------------
 
 import numpy as np
-
 from nupic.bindings.math import Random
 
-
+import os
+VERBOSITY = os.getenv('NUMENTA_VERBOSITY', 0)
 
 class BayesianSummingColumnPooler(object):
   """
@@ -49,9 +49,12 @@ class BayesianSummingColumnPooler(object):
 
                # Bayesian
                noise=0.01,  # lambda
-               learningRate=0.1,  # alpha
                activationThreshold=0.5, # probability such that a cell becomes active
-
+               forgetting=0.1,
+               useSupport=False,
+               avoidWeightExplosion=True,
+               resetProximalCounter=False,
+               useProximalProbabilities=True,
                seed=42):
     """
     Parameters:
@@ -176,12 +179,6 @@ class BayesianSummingColumnPooler(object):
     self.internalDistalBias = np.zeros(self.cellCount)
     self.proximalBias = np.zeros(self.cellCount)
 
-    # Initialise weights to first segment randomly TODO check whether this is necessary. (commented out)
-    # for d in self.distalWeights:
-    #   d[:, :] = np.random.random(d[:, :].shape)
-    # self.internalDistalWeights[:, :] = np.random.random(self.internalDistalWeights[:, :].shape)
-    # self.proximalWeights[:, :] = np.random.random(self.proximalWeights[:, :].shape)
-
     self.distalConnectionCounts = list(np.zeros((self.cellCount, n)) for n in lateralInputWidths)
     self.internalDistalConnectionCount = np.zeros((self.cellCount, self.cellCount))
     self.proximalConnectionCount = np.zeros((self.cellCount, self.inputWidth))
@@ -194,10 +191,16 @@ class BayesianSummingColumnPooler(object):
     self.proximalInputCount = np.zeros(self.inputWidth)
 
     self.updateCounter = 0
+    self.numberOfObjects = 0
 
     self.noise = noise
     self.activationThreshold = activationThreshold
+    self.forgetting = forgetting
 
+    self.useSupport = useSupport
+    self.avoidWeightExplosion = avoidWeightExplosion
+    self.resetProximalCounter = resetProximalCounter
+    self.useProximalProbabilities = useProximalProbabilities
 
   def compute(
           self,
@@ -234,7 +237,10 @@ class BayesianSummingColumnPooler(object):
 
     # inference step
     if not learn:
-      self._computeInferenceMode(feedforwardInput, lateralInputs, onlyProximal=onlyProximal)
+      self._computeInferenceMode(
+        feedforwardInput,
+        lateralInputs
+      )
 
     # learning step
     else:
@@ -277,8 +283,6 @@ class BayesianSummingColumnPooler(object):
             grow new synapses to.  This is assumed to be the predicted active
             cells of the input layer.
     """
-    prevActiveCells = self.activeCells
-
     # If there are not enough previously active cells, then we are no longer on
     # a familiar object.  Either our representation decayed due to the passage
     # of time (i.e. we moved somewhere else) or we were mistaken.  Either way,
@@ -289,7 +293,38 @@ class BayesianSummingColumnPooler(object):
       # Randomly activate sdrSize bits from an array with cellCount bits
       self.activeCells = _randomActivation(self.cellCount, self.sdrSize, self._random)
 
-    # Update moving averages -> could be extended to be updated in inference mode too
+      # Avoid weight explosion via only learn only frequency based on the current pattern
+      # Measure how often the connection to this particular pattern are evoked
+      if self.avoidWeightExplosion:
+        self.updateCounter = 0
+
+      # Reset proximal counter
+      if self.resetProximalCounter:
+        self._resetProximalCounter()
+
+      self._updateCount(
+        self.activeCells,
+        self.internalDistalConnectionCount,
+        self.internalDistalCellActivityCount,
+        self.activeCells,
+      )
+
+      # Number of objects
+      self.numberOfObjects += 1
+
+      # Internal distal learning
+      # Pattern does not change while output neurons are kept constantly active, hence weights only needed to be
+      # updated once
+      self.internalDistalWeights, \
+      self.internalDistalBias = self._learn(
+        self.internalDistalConnectionCount,
+        self.internalDistalCellActivityCount,
+        self.internalDistalCellActivityCount,
+        # Having recurrent connections, thus weights between each other are learnt
+        self.numberOfObjects
+      )
+
+    # Update Counts for proximal weights
     self._updateCount(
       self.activeCells,
       self.proximalConnectionCount,
@@ -298,6 +333,7 @@ class BayesianSummingColumnPooler(object):
       inputCount=self.proximalInputCount
     )
 
+    # Update counts for lateral weights to other columns
     for i, lateralInput in enumerate(lateralInputs):
       self._updateCount(
         self.activeCells,
@@ -307,48 +343,29 @@ class BayesianSummingColumnPooler(object):
         inputCount=self.distalInputCounts[i]
       )
 
-    self._updateCount(
-      self.activeCells,
-      self.internalDistalConnectionCount,
-      self.internalDistalCellActivityCount,
-      prevActiveCells,
+    # Increment update counter
+    self.updateCounter += 1
+
+    # Update weights based on current frequency
+    self.proximalWeights, \
+    self.proximalBias = self._learn(
+      self.proximalConnectionCount,
+      self.proximalCellActivityCount,
+      self.proximalInputCount,
+      self.updateCounter
     )
 
-    self.updateCounter += 1
-    # Learning
-    # If we have a union of cells active, don't learn.  This primarily affects
-    # online learning.
-    # if self.numberOfActiveCells() > self.maxSdrSize:
-    #  return
+    if VERBOSITY > 1:
+      act = self._activation(self.proximalWeights,feedforwardInput, self.proximalBias, self.noise)
+      print "Activation with current weights in learning", act[act > 0]
 
-    # Finally, now that we have decided which cells we should be learning on, do
-    # the actual learning.
-    if len(feedforwardInput) > 0: # Length of feed-forward input should always be equal to self.inputWidth
-                                  # Thus this is a tautology
-      self.proximalWeights, \
-      self.proximalBias = self._learn(
-        self.proximalConnectionCount,
-        self.proximalCellActivityCount,
-        self.proximalInputCount,
-        self.updateCounter
-      )
-
-      # External distal learning
-      for i, lateralInput in enumerate(lateralInputs):
-        self.distalWeights[i], \
-        self.distalBias[i] = self._learn(
-          self.distalConnectionCounts[i],
-          self.distalCellActivityCounts[i],
-          self.distalInputCounts[i],
-          self.updateCounter
-        )
-
-      # Internal distal learning
-      self.internalDistalWeights, \
-      self.internalDistalBias = self._learn(
-        self.internalDistalConnectionCount,
-        self.internalDistalCellActivityCount,
-        self.internalDistalCellActivityCount,  # Having recurrent connections, thus weights between each other are learnt
+    # External distal learning
+    for i, lateralInput in enumerate(lateralInputs):
+      self.distalWeights[i], \
+      self.distalBias[i] = self._learn(
+        self.distalConnectionCounts[i],
+        self.distalCellActivityCounts[i],
+        self.distalInputCounts[i],
         self.updateCounter
       )
 
@@ -371,113 +388,21 @@ class BayesianSummingColumnPooler(object):
             input bits
     """
 
-    prevActiveCells = self.activeCells
-    prevActiveCellIndices = np.where(prevActiveCells >= self.activationThreshold)[0]
-
-    # Calculate the feedforward supported cells
+    # Calculate the feed forward activation
+    # Support is only added if a prediction needs to be made
     feedForwardActivation = self._activation(self.proximalWeights, feedforwardInput, self.proximalBias, self.noise)
 
-    # Internal Distal
-    # internalDistalActivation = self._activation(self.internalDistalWeights, prevActiveCells, self.internalDistalBias, self.noise)
+    # Forgetting process for values that doesn't get feed forward input
+    self.activeCells -= self.forgetting*self.activeCells
+    # Update cell values with new activation
+    # Activation is either 1 (for every feed forward input) or it is set to the activation itself
+    self.activeCells[
+      feedForwardActivation > 0.0
+    ] = feedForwardActivation[feedForwardActivation > 0.0] if self.useProximalProbabilities else 1
 
-    # # Lateral connections to other cortical columns
-    # for i, lateralInput in enumerate(lateralInputs):
-    #   distalActivation = self._activation(self.distalWeights[i], lateralInput, self.distalBias[i], self.noise)
-
-    supportedFeedForward = self._supportedActivation(feedForwardActivation)
-    zippedFFActivationThreshold = zip(
-      range(len(supportedFeedForward[supportedFeedForward >= self.activationThreshold])),
-      supportedFeedForward[supportedFeedForward >= self.activationThreshold])
-    zippedFFActivationThreshold.sort(key=lambda t: t[1])
-    zippedFFActivationThreshold.reverse()
-    zippedFFActivation = zip(range(len(supportedFeedForward)), supportedFeedForward)
-    zippedFFActivation.sort(key=lambda t: t[1])
-    zippedFFActivation.reverse()
-    ffActivationTopN = zippedFFActivationThreshold if len(
-      zippedFFActivationThreshold) >= self.sdrSize else zippedFFActivation[:self.sdrSize]
-    indices, activation = zip(*ffActivationTopN)
-
-    self.activeCells[indices] = activation
-    # TODO check normalisation -> competition necessary?
-    self.activeCells /= self.activeCells.sum()
-    # chosenCells = np.array([], dtype="int")
-    #
-    # # First, activate the FF-supported cells that have the highest number of
-    # # lateral active segments (as long as it's not 0)
-    # if len(feedforwardSupportedCells) == 0:
-    #   pass
-    # else:
-    #   numActiveSegsForFFSuppCells = numActiveSegmentsByCell[feedforwardSupportedCells]
-    #
-    #   # This loop will select the FF-supported AND laterally-active cells, in
-    #   # order of descending lateral activation, until we exceed the sdrSize
-    #   # quorum - but will exclude cells with 0 lateral active segments.
-    #   ttop = np.max(numActiveSegsForFFSuppCells)
-    #   while ttop > 0 and len(chosenCells) < self.sdrSize:
-    #     supported = feedforwardSupportedCells[numActiveSegsForFFSuppCells >= ttop]
-    #     chosenCells = np.union1d(chosenCells, supported)
-    #     ttop -= 1
-    #
-    # # If we haven't filled the sdrSize quorum, add in inertial cells.
-    # if len(chosenCells) < self.sdrSize:
-    #   if self.useInertia:
-    #     prevCells = np.setdiff1d(prevActiveCellIndices, chosenCells)
-    #     inertialCap = int(len(prevCells) * self.inertiaFactor)
-    #     if inertialCap > 0:
-    #       numActiveSegsForPrevCells = numActiveSegmentsByCell[prevCells]
-    #       # We sort the previously-active cells by number of active lateral
-    #       # segments (this really helps).  We then activate them in order of
-    #       # descending lateral activation.
-    #       sortIndices = np.argsort(numActiveSegsForPrevCells)[::-1]
-    #       prevCells = prevCells[sortIndices]
-    #       numActiveSegsForPrevCells = numActiveSegsForPrevCells[sortIndices]
-    #
-    #       # We use inertiaFactor to limit the number of previously-active cells
-    #       # which can become active, forcing decay even if we are below quota.
-    #       prevCells = prevCells[:inertialCap]
-    #       numActiveSegsForPrevCells = numActiveSegsForPrevCells[:inertialCap]
-    #
-    #       # Activate groups of previously active cells by order of their lateral
-    #       # support until we either meet quota or run out of cells.
-    #       ttop = np.max(numActiveSegsForPrevCells)
-    #       while ttop >= 0 and len(chosenCells) < self.sdrSize:
-    #         chosenCells = np.union1d(chosenCells, prevCells[numActiveSegsForPrevCells >= ttop])
-    #         ttop -= 1
-    #
-    # # If we haven't filled the sdrSize quorum, add cells that have feedforward
-    # # support and no lateral support.
-    # discrepancy = self.sdrSize - len(chosenCells)
-    # if discrepancy > 0:
-    #   remFFcells = np.setdiff1d(feedforwardSupportedCells, chosenCells)
-    #
-    #   # Inhibit cells proportionally to the number of cells that have already
-    #   # been chosen. If ~0 have been chosen activate ~all of the feedforward
-    #   # supported cells. If ~sdrSize have been chosen, activate very few of
-    #   # the feedforward supported cells.
-    #
-    #   # Use the discrepancy:sdrSize ratio to determine the number of cells to
-    #   # activate.
-    #   n = (len(remFFcells) * discrepancy) // self.sdrSize
-    #   # Activate at least 'discrepancy' cells.
-    #   n = max(n, discrepancy)
-    #   # If there aren't 'n' available, activate all of the available cells.
-    #   n = min(n, len(remFFcells))
-    #
-    #   if len(remFFcells) > n:
-    #     selected = _sample(self._random, remFFcells, n)
-    #     chosenCells = np.append(chosenCells, selected)
-    #   else:
-    #     chosenCells = np.append(chosenCells, remFFcells)
-    #
-    # chosenCells.sort()
-    # self.activeCells = np.zeros(self.cellCount, dtype="float64")
-    # # TODO: Inference mode only sets them to 1, but we could calculate a value from the proximal/distal support
-    # self.activeCells[chosenCells] = 1 # feedForwardActivation[chosenCells] + distal/lateral mult/sum?
-
-    print "Column pooler inference input/distalSupport/output"
-    print feedforwardInput.nonzero()
-    # print numActiveSegmentsByCell[numActiveSegmentsByCell > 0]
-    print self.activeCells.nonzero()
+    if VERBOSITY > 1:
+      print "Column pooler inference input", feedforwardInput.nonzero()
+      print "Column pooler activation output", self.activeCells[self.activeCells.nonzero()[0]]
 
   def numberOfInputs(self):
     """
@@ -498,7 +423,25 @@ class BayesianSummingColumnPooler(object):
 
   def getActiveCellsIndices(self):
     # np.where returns tuple for all dimensions -> return array of fist dimension
-    return np.where(self.activeCells >= self.activationThreshold)[0]
+    # return np.where(self.activeCells >= self.activationThreshold)[0]
+    return np.nonzero(self.activeCells)[0]
+
+  def getObjectPrediction(self):
+    """
+    :returns: Prediction of the most probable object
+    """
+    # If support is used, activity is no probabilities anymore
+    # THus the threshold can be lower than 0
+    activity = self.activeCells if not self.useSupport else self._supportedActivation(self.activeCells)
+    threshold = 0.0 if not self.useSupport else np.NINF
+
+    # No probabilities anymore, thus do not filter for values greater than 0
+    zippedActivation = filter(lambda x: x[1] > threshold, zip(range(len(activity)), activity))
+    zippedActivation.sort(key=lambda t: t[1])
+    zippedActivation.reverse()
+    indices, support = zip(*zippedActivation[:self.sdrSize])
+
+    return list(indices)
 
   def getActiveCellValues(self):
     return self.activeCells
@@ -535,9 +478,22 @@ class BayesianSummingColumnPooler(object):
     """
     self.useInertia = useInertia
 
-  def _supportedActivation(self, feedForwardActivation):
-    supportedActivation = np.dot(self.internalDistalWeights, feedForwardActivation)
-    supportedActivation /= self.internalDistalBias
+  def _resetProximalCounter(self):
+    self.proximalConnectionCount = np.zeros(self.proximalConnectionCount.shape)
+    self.proximalCellActivityCount = np.zeros(self.proximalCellActivityCount.shape)
+    self.proximalInputCount = np.zeros(self.proximalInputCount.shape)
+
+  def _supportedActivation(self, activation):
+    """
+    Introduce concept of mutual entropy (similar to mutual information)
+    activation_j = sum( - activation_i * E(log(w_ij)))
+    :returns: mutual entropy
+    """
+    # Mask invalid values since it would otherwise lead to all values equal -inf
+    weights = np.ma.masked_invalid(self.internalDistalWeights)
+    supportedActivation = weights.dot(activation)
+    mask = np.ma.getmask(supportedActivation)
+    supportedActivation[mask] = np.NINF
     return supportedActivation
 
   def _updateCount(
@@ -550,6 +506,7 @@ class BayesianSummingColumnPooler(object):
   ):
 
     # Updating connection count
+    inputSize = connectionCount.shape[-1]
     connectionMatrix = np.outer(cells, inputValues)
     connectionMatrix = connectionMatrix.reshape(self.cellCount, inputSize)
     connectionCount += connectionMatrix
@@ -562,15 +519,19 @@ class BayesianSummingColumnPooler(object):
       inputCount += inputValues
 
   @staticmethod
-  def _activation(weights, input, bias, noise, use_bias=True):
+  def _activation(weights, input, bias, noise, useBias=True, ignoreNinf=False):
     # Runtime warnings for negative infinity can be ignored here
     activeMask = input > 0
     # Only sum over active input -> otherwise large negative sum due to sparse activity and 0 inputs with noise
-    activation = np.log(np.multiply(weights[:, activeMask], input[activeMask]) + noise)
+    # activation = np.log(np.multiply(weights[:, activeMask], input[activeMask]) + noise)
+    activation = np.multiply(weights[:, activeMask], input[activeMask]) + noise
     # Special case if active mask has no active inputs (e.g initialisation)
     # then activation becomes 0 and hence the exp of it 1
-    activation = activation.sum(axis=1) if np.any(activeMask) else activation.sum(axis=1) + np.NINF
-    activation = activation if not use_bias else activation + bias
+    if not ignoreNinf:
+      activation = activation.sum(axis=1) if np.any(activeMask) else activation.sum(axis=1) + np.NINF
+    else:
+      activation = np.ma.masked_invalid(activation).sum(axis=1) if np.any(activeMask) else activation.sum(axis=1) + np.NINF
+    activation = activation if not useBias else activation + bias
     return np.exp(activation)
 
   @staticmethod
@@ -580,13 +541,13 @@ class BayesianSummingColumnPooler(object):
           inputCount,
           updateCounter
   ):
-    weights = connectionCount / np.outer(
+    weights = (connectionCount * updateCounter)/ np.outer(
       activationCount,
       inputCount
     ).reshape(connectionCount.shape)
     # set division by zero to zero since this represents unused segments
     weights[np.isnan(weights)] = 0
-
+    weights = np.log(weights)
     # Unused segments are set to -inf. That is desired since we take the exp function for the activation
     # exp(-inf) = 0 what is the desired outcome
     bias = np.log(activationCount / float(updateCounter))
