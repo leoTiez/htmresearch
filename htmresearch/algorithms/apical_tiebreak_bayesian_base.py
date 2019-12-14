@@ -381,13 +381,6 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
         return cell_activity
 
     def _learn(self, isBasal=True):
-        if isBasal:
-            weights = self.basalWeights
-            bias = self.basalBias
-        else:
-            weights = self.apicalWeights
-            bias = self.apicalBias
-
         weights = self._updateWeights(isBasal=isBasal)
         # set division by zero to zero since this represents unused segments
         weights[np.isnan(weights)] = 0
