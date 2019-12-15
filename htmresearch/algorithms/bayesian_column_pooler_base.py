@@ -29,7 +29,7 @@ class BayesianColumnPoolerBase(object):
 
     CONNECTION_ENUM = {
         "proximal": 0,
-        "internalDistak": 1,
+        "internalDistal": 1,
         "distal": 2
     }
 
@@ -247,7 +247,7 @@ class BayesianColumnPoolerBase(object):
     ###################################################################################################################
     # Private methods
     ###################################################################################################################
-    
+
     # TODO: Here and in bayesian-apical-TM: Sampling the connections we learn on? (e.g. with growth candidates)
     # Currently all weights are changed
     def _computeLearningMode(self,
@@ -290,6 +290,7 @@ class BayesianColumnPoolerBase(object):
             # Randomly activate sdrSize bits from an array with cellCount bits
             self.activeCells = BayesianColumnPoolerBase._randomActivation(self.cellCount, self.sdrSize, self._random)
 
+            self._beforeUpdate(connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["internalDistal"])
             self._updateConnectionData(connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["internalDistal"])
             self._afterUpdate(connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["internalDistal"])
 
@@ -302,14 +303,19 @@ class BayesianColumnPoolerBase(object):
             )
 
         # Update Counts for proximal weights
-        self._updateConnectionData(connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["proximal"])
-
+        self._beforeUpdate(connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["proximal"])
+        self._updateConnectionData(
+            connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["proximal"],
+            inputValues=feedforwardInput
+        )
         self._afterUpdate(connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["proximal"])
 
         # Update counts for lateral weights to other columns
-        for i, _ in enumerate(lateralInputs):
+        self._beforeUpdate(connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["distal"])
+        for i, lateralInput in enumerate(lateralInputs):
             self._updateConnectionData(
                 connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["distal"],
+                inputValues=lateralInput,
                 index=i
             )
 
@@ -464,7 +470,7 @@ class BayesianColumnPoolerBase(object):
         # If support is used, activity is no probabilities anymore
         # THus the threshold can be lower than 0
         activity = self.activeCells if not self.useSupport else self._supportedActivation(self.activeCells,
-                                                                                          self.distalWeights)
+                                                                                          self.internalDistalWeights)
         threshold = 0.0 if not self.useSupport else np.NINF
 
         # No probabilities anymore, thus do not filter for values greater than 0
@@ -506,6 +512,9 @@ class BayesianColumnPoolerBase(object):
     ###################################################################################################################
     # Abstract methods
     ###################################################################################################################
+
+    def _beforeUpdate(self, connectionIndicator):
+        pass
 
     def _updateConnectionData(self, connectionIndicator, **kwargs):
         pass
