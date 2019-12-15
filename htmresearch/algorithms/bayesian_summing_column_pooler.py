@@ -20,43 +20,40 @@
 # ----------------------------------------------------------------------
 
 import numpy as np
-from nupic.bindings.math import Random
+from htmresearch.algorithms.bayesian_column_pooler_base import BayesianColumnPoolerBase
 
-import os
-VERBOSITY = os.getenv('NUMENTA_VERBOSITY', 0)
 
-class BayesianSummingColumnPooler(object):
-  """
-  This class constitutes a temporary implementation for a cross-column pooler.
-  The implementation goal of this class is to prove basic properties before
-  creating a cleaner implementation.
-  """
-
-  def __init__(self,
-               inputWidth,
-               lateralInputWidths=(),
-               cellCount=4096,
-               sdrSize=40,
-               maxSdrSize = None,
-               minSdrSize = None,
-
-               # Proximal
-               sampleSizeProximal=20,
-
-               # Distal
-               sampleSizeDistal=20,
-               inertiaFactor=1.,
-
-               # Bayesian
-               noise=0.01,  # lambda
-               activationThreshold=0.5, # probability such that a cell becomes active
-               forgetting=0.1,
-               useSupport=False,
-               avoidWeightExplosion=True,
-               resetProximalCounter=False,
-               useProximalProbabilities=True,
-               seed=42):
+class BayesianSummingColumnPooler(BayesianColumnPoolerBase):
     """
+    This class constitutes a temporary implementation for a cross-column pooler.
+    The implementation goal of this class is to prove basic properties before
+    creating a cleaner implementation.
+    """
+
+    def __init__(
+            self,
+            inputWidth,
+            lateralInputWidths=(),
+            cellCount=4096,
+            sdrSize=40,
+            maxSdrSize=None,
+            minSdrSize=None,
+            # Proximal
+            sampleSizeProximal=20,
+            # Distal
+            sampleSizeDistal=20,
+            inertiaFactor=1.,
+            # Bayesian
+            noise=0.01,  # lambda
+            activationThreshold=0.5,  # probability such that a cell becomes active
+            forgetting=0.1,
+            useSupport=False,
+            avoidWeightExplosion=True,
+            resetProximalCounter=False,
+            useProximalProbabilities=True,
+            seed=42
+    ):
+        """
     Parameters:
     ----------------------------
     @param  inputWidth (int)
@@ -142,452 +139,147 @@ class BayesianSummingColumnPooler(object):
             Random number generator seed
     """
 
-    assert maxSdrSize is None or maxSdrSize >= sdrSize
-    assert minSdrSize is None or minSdrSize <= sdrSize
+        super(BayesianSummingColumnPooler, self).__init__(
+            inputWidth=inputWidth,
+            lateralInputWidths=lateralInputWidths,
+            cellCount=cellCount,
+            sdrSize=sdrSize,
+            maxSdrSize=maxSdrSize,
+            minSdrSize=minSdrSize,
+            sampleSizeProximal=sampleSizeProximal,
+            sampleSizeDistal=sampleSizeDistal,
+            inertiaFactor=inertiaFactor,
+            noise=noise,
+            activationThreshold=activationThreshold,
+            forgetting=forgetting,
+            useSupport=useSupport,
+            avoidWeightExplosion=avoidWeightExplosion,
+            resetProximalCounter=resetProximalCounter,
+            useProximalProbabilities=useProximalProbabilities,
+            seed=seed
+        )
 
-    self.inputWidth = inputWidth
-    self.lateralInputWidths = lateralInputWidths
-    self.cellCount = cellCount
-    self.sdrSize = sdrSize
-    if maxSdrSize is None:
-      self.maxSdrSize = sdrSize
-    else:
-      self.maxSdrSize = maxSdrSize
-    if minSdrSize is None:
-      self.minSdrSize = sdrSize
-    else:
-      self.minSdrSize = minSdrSize
-    self.sampleSizeProximal = sampleSizeProximal
-    self.sampleSizeDistal = sampleSizeDistal
-    self.inertiaFactor = inertiaFactor
+        self.distalConnectionCounts = list(np.zeros((self.cellCount, n)) for n in lateralInputWidths)
+        self.internalDistalConnectionCount = np.zeros((self.cellCount, self.cellCount))
+        self.proximalConnectionCount = np.zeros((self.cellCount, self.inputWidth))
 
-    self.activeCells = np.zeros(self.cellCount, dtype="float64")
-    self._random = Random(seed)
-    self.useInertia=True
+        self.distalCellActivityCounts = list(np.zeros(self.cellCount) for n in lateralInputWidths)
+        self.internalDistalCellActivityCount = np.zeros(self.cellCount)
+        self.proximalCellActivityCount = np.zeros(self.cellCount)
 
-    # Bayesian parameters (weights, bias, moving averages)
-    # Each row represents one segment on a cell, so each cell potentially has
-    # 1 proximal segment and 1+len(lateralInputWidths) distal segments.
+        self.distalInputCounts = list(np.zeros(n) for n in lateralInputWidths)
+        self.proximalInputCount = np.zeros(self.inputWidth)
 
-    # Weights 2D-Matrix - (1 segment per) cells x distalInput
-    # Needs to be split up, because each segment only connects to the specified input
-    self.distalWeights = list(np.zeros((self.cellCount, n)) for n in lateralInputWidths)
-    self.internalDistalWeights = np.zeros((self.cellCount, self.cellCount))
-    self.proximalWeights = np.zeros((self.cellCount, self.inputWidth))
-
-    self.distalBias = list(np.zeros(self.cellCount) for n in lateralInputWidths)
-    self.internalDistalBias = np.zeros(self.cellCount)
-    self.proximalBias = np.zeros(self.cellCount)
-
-    self.distalConnectionCounts = list(np.zeros((self.cellCount, n)) for n in lateralInputWidths)
-    self.internalDistalConnectionCount = np.zeros((self.cellCount, self.cellCount))
-    self.proximalConnectionCount = np.zeros((self.cellCount, self.inputWidth))
-
-    self.distalCellActivityCounts = list(np.zeros(self.cellCount) for n in lateralInputWidths)
-    self.internalDistalCellActivityCount = np.zeros(self.cellCount)
-    self.proximalCellActivityCount = np.zeros(self.cellCount)
-
-    self.distalInputCounts = list(np.zeros(n) for n in lateralInputWidths)
-    self.proximalInputCount = np.zeros(self.inputWidth)
-
-    self.updateCounter = 0
-    self.numberOfObjects = 0
-
-    self.noise = noise
-    self.activationThreshold = activationThreshold
-    self.forgetting = forgetting
-
-    self.useSupport = useSupport
-    self.avoidWeightExplosion = avoidWeightExplosion
-    self.resetProximalCounter = resetProximalCounter
-    self.useProximalProbabilities = useProximalProbabilities
-
-  def compute(
-          self,
-          feedforwardInput=(),
-          lateralInputs=(),
-          feedforwardGrowthCandidates=None,
-          learn=True,
-          predictedInput=None,
-          onlyProximal=False
-  ):
-    """
-    Runs one time step of the column pooler algorithm.
-
-    @param  feedforwardInput (sequence)
-            Sorted indices of active feedforward input bits
-
-    @param  lateralInputs (list of sequences)
-            For each lateral layer, a list of sorted indices of active lateral
-            input bits
-
-    @param  feedforwardGrowthCandidates (sequence or None)
-            Sorted indices of feedforward input bits that active cells may grow
-            new synapses to. If None, the entire feedforwardInput is used.
-
-    @param  learn (bool)
-            If True, we are learning a new object
-
-    @param predictedInput (sequence)
-           Sorted indices of predicted cells in the TM layer.
-    """
-
-    if feedforwardGrowthCandidates is None:
-      feedforwardGrowthCandidates = feedforwardInput
-
-    # inference step
-    if not learn:
-      self._computeInferenceMode(
-        feedforwardInput,
-        lateralInputs
-      )
-
-    # learning step
-    else:
-      self._computeLearningMode(
-        feedforwardInput,
-        lateralInputs,
-        feedforwardGrowthCandidates
-      )
-
-
-  # TODO: Here and in bayesian-apical-TM: Sampling the connections we learn on? (e.g. with growth candidates)
-  # Currently all weights are changed
-  def _computeLearningMode(self,
-                           feedforwardInput,
-                           lateralInputs,
-                           feedforwardGrowthCandidates,
-                           temporalLearningRate=None  # Makes it possible to update moving averages while not learning
-                                                      # and to turn off updating moving averages
-                           ):
-    """
-    Learning mode: we are learning a new object in an online fashion. If there
-    is no prior activity, we randomly activate 'sdrSize' cells and create
-    connections to incoming input. If there was prior activity, we maintain it.
-    If we have a union, we simply do not learn at all.
-
-    These cells will represent the object and learn distal connections to each
-    other and to lateral cortical columns.
-
-    Parameters:
-    ----------------------------
-    @param  feedforwardInput (sequence)
-            Sorted indices of active feedforward input bits
-
-    @param  lateralInputs (list of sequences)
-            For each lateral layer, a list of sorted indices of active lateral
-            input bits
-
-    @param  feedforwardGrowthCandidates (sequence or None)
-            Sorted indices of feedforward input bits that the active cells may
-            grow new synapses to.  This is assumed to be the predicted active
-            cells of the input layer.
-    """
-    # If there are not enough previously active cells, then we are no longer on
-    # a familiar object.  Either our representation decayed due to the passage
-    # of time (i.e. we moved somewhere else) or we were mistaken.  Either way,
-    # create a new SDR and learn on it.
-    # This case is the only way different object representations are created.
-    # enforce the active cells in the output layer
-    if self.numberOfActiveCells() < self.minSdrSize:
-      # Randomly activate sdrSize bits from an array with cellCount bits
-      self.activeCells = _randomActivation(self.cellCount, self.sdrSize, self._random)
-
-      # Avoid weight explosion via only learn only frequency based on the current pattern
-      # Measure how often the connection to this particular pattern are evoked
-      if self.avoidWeightExplosion:
         self.updateCounter = 0
+        self.numberOfObjects = 0
 
-      # Reset proximal counter
-      if self.resetProximalCounter:
-        self._resetProximalCounter()
+    def _beforeUpdate(self, connectionIndicator):
+        if connectionIndicator == self.CONNECTION_ENUM["internalDistal"]:
+            if self.avoidWeightExplosion:
+                self.updateCounter = 0
+            if self.resetProximalCounter:
+                self._resetProximalCounter()
 
-      self._updateCount(
-        self.activeCells,
-        self.internalDistalConnectionCount,
-        self.internalDistalCellActivityCount,
-        self.activeCells,
-      )
+    def _updateConnectionData(self, connectionIndicator, **kwargs):
+        if connectionIndicator == self.CONNECTION_ENUM["proximal"]:
+            inputValues = kwargs["inputValues"]
+            connectionCount = self.proximalConnectionCount
+            cellActivityCount = self.proximalCellActivityCount
+            inputCount = self.proximalInputCount
 
-      # Number of objects
-      self.numberOfObjects += 1
+        elif connectionIndicator == self.CONNECTION_ENUM["internalDistal"]:
+            inputValues = self.activeCells
+            connectionCount = self.internalDistalConnectionCount
+            cellActivityCount = self.internalDistalCellActivityCount
+            inputCount = None
 
-      # Internal distal learning
-      # Pattern does not change while output neurons are kept constantly active, hence weights only needed to be
-      # updated once
-      self.internalDistalWeights, \
-      self.internalDistalBias = self._learn(
-        self.internalDistalConnectionCount,
-        self.internalDistalCellActivityCount,
-        self.internalDistalCellActivityCount,
-        # Having recurrent connections, thus weights between each other are learnt
-        self.numberOfObjects
-      )
+        elif connectionIndicator == self.CONNECTION_ENUM["distal"]:
+            inputValues = kwargs["inputValues"]
+            connectionCount = self.distalConnectionCounts
+            cellActivityCount = self.distalCellActivityCounts
+            inputCount = self.distalInputCounts
 
-    # Update Counts for proximal weights
-    self._updateCount(
-      self.activeCells,
-      self.proximalConnectionCount,
-      self.proximalCellActivityCount,
-      feedforwardInput,
-      inputCount=self.proximalInputCount
-    )
+        else:
+            raise AssertionError("Connection indicator is set to an invalid value.\n"
+                                 "Valid parameter values = proximal, internalDistal and distal")
 
-    # Update counts for lateral weights to other columns
-    for i, lateralInput in enumerate(lateralInputs):
-      self._updateCount(
-        self.activeCells,
-        self.distalConnectionCounts[i],
-        self.distalCellActivityCounts[i],
-        lateralInput,
-        inputCount=self.distalInputCounts[i]
-      )
+        # Updating connection count
+        inputSize = connectionCount.shape[-1]
+        connectionMatrix = np.outer(self.activeCells, inputValues)
+        connectionMatrix = connectionMatrix.reshape(self.cellCount, inputSize)
+        connectionCount += connectionMatrix
 
-    # Increment update counter
-    self.updateCounter += 1
+        # Updating cell activity count
+        cellActivityCount += self.activeCells
 
-    # Update weights based on current frequency
-    self.proximalWeights, \
-    self.proximalBias = self._learn(
-      self.proximalConnectionCount,
-      self.proximalCellActivityCount,
-      self.proximalInputCount,
-      self.updateCounter
-    )
+        if inputCount is not None:
+            # Updating input activity count
+            inputCount += inputValues
 
-    if VERBOSITY > 1:
-      act = self._activation(self.proximalWeights,feedforwardInput, self.proximalBias, self.noise)
-      print "Activation with current weights in learning", act[act > 0]
+    def _afterUpdate(self, connectionIndicator):
+        if connectionIndicator == self.CONNECTION_ENUM["internalDistal"]:
+            self.numberOfObjects += 1
+        if connectionIndicator == self.CONNECTION_ENUM["distal"]:
+            self.updateCounter += 1
 
-    # External distal learning
-    for i, lateralInput in enumerate(lateralInputs):
-      self.distalWeights[i], \
-      self.distalBias[i] = self._learn(
-        self.distalConnectionCounts[i],
-        self.distalCellActivityCounts[i],
-        self.distalInputCounts[i],
-        self.updateCounter
-      )
+    def _updateWeights(self, connectionIndicator, **kwargs):
+        if connectionIndicator == self.CONNECTION_ENUM["proximal"]:
+            connectionCount = self.proximalConnectionCount
+            activationCount = self.proximalCellActivityCount
+            inputCount = self.proximalInputCount
+            updateCounter = self.updateCounter
 
+        elif connectionIndicator == self.CONNECTION_ENUM["internalDistal"]:
+            connectionCount = self.internalDistalConnectionCount
+            activationCount = self.internalDistalCellActivityCount
+            inputCount = self.internalDistalCellActivityCount
+            updateCounter = self.numberOfObjects
 
-  def _computeInferenceMode(self, feedforwardInput, lateralInputs, onlyProximal=False):
-    """
-    Inference mode: if there is some feedforward activity, perform
-    spatial pooling on it to recognize previously known objects, then use
-    lateral activity to activate a subset of the cells with feedforward
-    support. If there is no feedforward activity, use lateral activity to
-    activate a subset of the previous active cells.
+        elif connectionIndicator == self.CONNECTION_ENUM["distal"]:
+            index = kwargs["index"]
+            connectionCount = self.distalConnectionCounts[index]
+            activationCount = self.distalCellActivityCounts[index]
+            inputCount = self.distalInputCounts[index]
+            updateCounter = self.updateCounter[index]
 
-    Parameters:
-    ----------------------------
-    @param  feedforwardInput (sequence)
-            Sorted indices of active feedforward input bits
+        else:
+            raise AssertionError("Connection indicator is set to an invalid value.\n"
+                                 "Valid parameter values = proximal, internalDistal and distal")
 
-    @param  lateralInputs (list of sequences)
-            For each lateral layer, a list of sorted indices of active lateral
-            input bits
-    """
+        weights = (connectionCount * updateCounter) / np.outer(
+            activationCount,
+            inputCount
+        ).reshape(connectionCount.shape)
 
-    # Calculate the feed forward activation
-    # Support is only added if a prediction needs to be made
-    feedForwardActivation = self._activation(self.proximalWeights, feedforwardInput, self.proximalBias, self.noise)
+        return weights
 
-    # Forgetting process for values that doesn't get feed forward input
-    self.activeCells -= self.forgetting*self.activeCells
-    # Update cell values with new activation
-    # Activation is either 1 (for every feed forward input) or it is set to the activation itself
-    self.activeCells[
-      feedForwardActivation > 0.0
-    ] = feedForwardActivation[feedForwardActivation > 0.0] if self.useProximalProbabilities else 1
+    def _updateBias(self, connectionIndicator, **kwargs):
+        if connectionIndicator == self.CONNECTION_ENUM["proximal"]:
+            activationCount = self.proximalCellActivityCount
+            updateCounter = self.updateCounter
 
-    if VERBOSITY > 1:
-      print "Column pooler inference input", feedforwardInput.nonzero()
-      print "Column pooler activation output", self.activeCells[self.activeCells.nonzero()[0]]
+        elif connectionIndicator == self.CONNECTION_ENUM["internalDistal"]:
+            activationCount = self.internalDistalCellActivityCount
+            updateCounter = self.numberOfObjects
 
-  def numberOfInputs(self):
-    """
-    Returns the number of inputs into this layer
-    """
-    return self.inputWidth
+        elif connectionIndicator == self.CONNECTION_ENUM["distal"]:
+            index = kwargs["index"]
+            activationCount = self.distalCellActivityCounts[index]
+            updateCounter = self.updateCounter[index]
 
+        else:
+            raise AssertionError("Connection indicator is set to an invalid value.\n"
+                                 "Valid parameter values = proximal, internalDistal and distal")
 
-  def numberOfCells(self):
-    """
-    Returns the number of cells in this layer.
-    @return (int) Number of cells
-    """
-    return self.cellCount
+        bias = np.log(activationCount / float(updateCounter))
+        return bias
 
-  def numberOfActiveCells(self):
-    return sum(self.activeCells > self.activationThreshold)
+    ###################################################################################################################
+    # Newly added private functions
+    ###################################################################################################################
 
-  def getActiveCellsIndices(self):
-    # np.where returns tuple for all dimensions -> return array of fist dimension
-    # return np.where(self.activeCells >= self.activationThreshold)[0]
-    return np.nonzero(self.activeCells)[0]
+    def _resetProximalCounter(self):
+        self.proximalConnectionCount = np.zeros(self.proximalConnectionCount.shape)
+        self.proximalCellActivityCount = np.zeros(self.proximalCellActivityCount.shape)
+        self.proximalInputCount = np.zeros(self.proximalInputCount.shape)
 
-  def getObjectPrediction(self):
-    """
-    :returns: Prediction of the most probable object
-    """
-    # If support is used, activity is no probabilities anymore
-    # THus the threshold can be lower than 0
-    activity = self.activeCells if not self.useSupport else self._supportedActivation(self.activeCells)
-    threshold = 0.0 if not self.useSupport else np.NINF
-
-    # No probabilities anymore, thus do not filter for values greater than 0
-    zippedActivation = filter(lambda x: x[1] > threshold, zip(range(len(activity)), activity))
-    zippedActivation.sort(key=lambda t: t[1])
-    zippedActivation.reverse()
-    indices, support = zip(*zippedActivation[:self.sdrSize])
-
-    return list(indices)
-
-  def getActiveCellValues(self):
-    return self.activeCells
-
-  def getActiveCells(self):
-    """
-    Returns the indices of the active cells.
-    @return (list) Indices of active cells.
-    """
-    return self.getActiveCellsIndices()
-
-  def reset(self):
-    """
-    Reset internal states. When learning this signifies we are to learn a
-    unique new object.
-    """
-    self.activeCells = np.zeros(self.cellCount, dtype="float64")
-
-  def getUseInertia(self):
-    """
-    Get whether we actually use inertia  (i.e. a fraction of the
-    previously active cells remain active at the next time step unless
-    inhibited by cells with both feedforward and lateral support).
-    @return (Bool) Whether inertia is used.
-    """
-    return self.useInertia
-
-  def setUseInertia(self, useInertia):
-    """
-    Sets whether we actually use inertia (i.e. a fraction of the
-    previously active cells remain active at the next time step unless
-    inhibited by cells with both feedforward and lateral support).
-    @param useInertia (Bool) Whether inertia is used.
-    """
-    self.useInertia = useInertia
-
-  def _resetProximalCounter(self):
-    self.proximalConnectionCount = np.zeros(self.proximalConnectionCount.shape)
-    self.proximalCellActivityCount = np.zeros(self.proximalCellActivityCount.shape)
-    self.proximalInputCount = np.zeros(self.proximalInputCount.shape)
-
-  def _supportedActivation(self, activation):
-    """
-    Introduce concept of mutual entropy (similar to mutual information)
-    activation_j = sum( - activation_i * E(log(w_ij)))
-    :returns: mutual entropy
-    """
-    # Mask invalid values since it would otherwise lead to all values equal -inf
-    weights = np.ma.masked_invalid(self.internalDistalWeights)
-    supportedActivation = weights.dot(activation)
-    mask = np.ma.getmask(supportedActivation)
-    supportedActivation[mask] = np.NINF
-    return supportedActivation
-
-  def _updateCount(
-          self,
-          cells,
-          connectionCount,
-          cellActivityCount,
-          inputValues,
-          inputCount=None
-  ):
-
-    # Updating connection count
-    inputSize = connectionCount.shape[-1]
-    connectionMatrix = np.outer(cells, inputValues)
-    connectionMatrix = connectionMatrix.reshape(self.cellCount, inputSize)
-    connectionCount += connectionMatrix
-
-    # Updating cell activity count
-    cellActivityCount += cells
-
-    if inputCount is not None:
-      # Updating input activity count
-      inputCount += inputValues
-
-  @staticmethod
-  def _activation(weights, input, bias, noise, useBias=True, ignoreNinf=False):
-    # Runtime warnings for negative infinity can be ignored here
-    activeMask = input > 0
-    # Only sum over active input -> otherwise large negative sum due to sparse activity and 0 inputs with noise
-    # activation = np.log(np.multiply(weights[:, activeMask], input[activeMask]) + noise)
-    activation = np.multiply(weights[:, activeMask], input[activeMask]) + noise
-    # Special case if active mask has no active inputs (e.g initialisation)
-    # then activation becomes 0 and hence the exp of it 1
-    if not ignoreNinf:
-      activation = activation.sum(axis=1) if np.any(activeMask) else activation.sum(axis=1) + np.NINF
-    else:
-      activation = np.ma.masked_invalid(activation).sum(axis=1) if np.any(activeMask) else activation.sum(axis=1) + np.NINF
-    activation = activation if not useBias else activation + bias
-    return np.exp(activation)
-
-  @staticmethod
-  def _learn(
-          connectionCount,
-          activationCount,
-          inputCount,
-          updateCounter
-  ):
-    weights = (connectionCount * updateCounter)/ np.outer(
-      activationCount,
-      inputCount
-    ).reshape(connectionCount.shape)
-    # set division by zero to zero since this represents unused segments
-    weights[np.isnan(weights)] = 0
-    weights = np.log(weights)
-    # Unused segments are set to -inf. That is desired since we take the exp function for the activation
-    # exp(-inf) = 0 what is the desired outcome
-    bias = np.log(activationCount / float(updateCounter))
-
-    return weights, bias
-
-#
-# Functionality that could be added to the C code or bindings
-#
-
-def _randomActivation(n, k, randomizer):
-  # Activate k from n bits, randomly (using custom randomizer for reproducibility)
-  activeCells = np.zeros(n, dtype="float64")
-  indices = _sampleRange(randomizer, 0, n, step=1, k=k)
-  activeCells[indices] = 1
-  return activeCells
-
-def _sampleRange(rng, start, end, step, k):
-  """
-  Equivalent to:
-
-  random.sample(xrange(start, end, step), k)
-
-  except it uses our random number generator.
-
-  This wouldn't need to create the arange if it were implemented in C.
-  """
-  array = np.empty(k, dtype="uint32")
-  rng.sample(np.arange(start, end, step, dtype="uint32"), array)
-  return array
-
-def _sample(rng, arr, k):
-  """
-  Equivalent to:
-
-  random.sample(arr, k)
-
-  except it uses our random number generator.
-  """
-  selected = np.empty(k, dtype="uint32")
-  rng.sample(np.asarray(arr, dtype="uint32"),
-             selected)
-  return selected
