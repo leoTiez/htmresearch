@@ -24,6 +24,7 @@ class BayesianTMTest(unittest.TestCase):
             "cellsPerColumn": 4,  # new: 4 # original 32
             "columnCount": 2048,  # new: 2048 # original: 2048
             "minThreshold": 0.35,
+            "useApicalTiebreak": True
         }
 
         self.exp1 = L4L2Experiment(
