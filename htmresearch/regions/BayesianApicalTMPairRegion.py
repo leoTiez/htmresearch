@@ -190,22 +190,6 @@ class BayesianApicalTMPairRegion(PyRegion):
           "count": 1,
           "constraints": ""
         },
-
-        "initialPermanence": {
-          "description": "Initial permanence of a new synapse.",
-          "accessMode": "Read",
-          "dataType": "Real32",
-          "count": 1,
-          "constraints": ""
-        },
-        "connectedPermanence": {
-          "description": ("If the permanence value for a synapse is greater "
-                          "than this value, it is said to be connected."),
-          "accessMode": "Read",
-          "dataType": "Real32",
-          "count": 1,
-          "constraints": ""
-        },
         "minThreshold": {
           "description": ("Minimal excitation of a segment required to be considered"
                           "to be active"),
@@ -246,6 +230,12 @@ class BayesianApicalTMPairRegion(PyRegion):
           "dataType": "Real32",
           "count": 1
         },
+        "useApicalTiebreak": {
+          "description": "Flag for using apical information",
+          "accessMode": "Read",
+          "dataType": "Bool",
+          "count": 1
+        },
         "seed": {
           "description": "Seed for the random number generator.",
           "accessMode": "Read",
@@ -275,7 +265,6 @@ class BayesianApicalTMPairRegion(PyRegion):
 
                # TM params
                cellsPerColumn=32,
-               initialPermanence=0.21,
                minThreshold=0.5,
                sampleSize=20,
                maxSegmentsPerCell=255,
@@ -283,6 +272,7 @@ class BayesianApicalTMPairRegion(PyRegion):
                seed=42,
                noise=0.01,  # lambda
                learningRate=0.1,  # alpha
+               useApicalTiebreak=False,
                # Region params
                implementation="BayesianApicalTiebreak",
                learn=True,
@@ -295,7 +285,6 @@ class BayesianApicalTMPairRegion(PyRegion):
 
     # TM params
     self.cellsPerColumn = cellsPerColumn
-    self.initialPermanence = initialPermanence
     self.minThreshold = minThreshold
     self.sampleSize = sampleSize
     self.maxSegmentsPerCell = maxSegmentsPerCell
@@ -303,6 +292,7 @@ class BayesianApicalTMPairRegion(PyRegion):
     self.seed = seed
     self.noise = noise
     self.learningRate = learningRate
+    self.useApicalTiebreak = useApicalTiebreak
 
     # Region params
     self.implementation = implementation
@@ -325,13 +315,13 @@ class BayesianApicalTMPairRegion(PyRegion):
         "basalInputSize": self.basalInputWidth,
         "apicalInputSize": self.apicalInputWidth,
         "cellsPerColumn": self.cellsPerColumn,
-        "initialPermanence": self.initialPermanence,
         "minThreshold": self.minThreshold,
         "sampleSize": self.sampleSize,
         "maxSegmentsPerCell": self.maxSegmentsPerCell,
         "seed": self.seed,
         "noise": self.noise,
         "learningRate": self.learningRate,
+        "useApicalTiebreak": self.useApicalTiebreak
       }
 
       if self.implementation == "Bayesian":

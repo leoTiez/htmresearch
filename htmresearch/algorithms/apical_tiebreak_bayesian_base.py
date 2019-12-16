@@ -56,14 +56,13 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
             basalInputSize=0,  # Must be non-equal zero
             apicalInputSize=0,  # Must be non-equal zero
             cellsPerColumn=32,
-            initialPermanence=0.21,
             # Changed to float
             minThreshold=0.5,
             sampleSize=20,
             noise=0.01,  # lambda
             learningRate=0.1,  # alpha
             maxSegmentsPerCell=255,
-            useApicalTriebreak=False,
+            useApicalTiebreak=False,
             seed=42
     ):
         """
@@ -83,9 +82,6 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
         The activation threshold of basal (lateral) segments for cells that have
         active apical segments. If equal to activationThreshold (default),
         this parameter has no effect.
-
-        @param initialPermanence (float)
-        Initial permanence of a new synapse
 
         @param minThreshold (int)
         If the number of potential synapses active on a segment is at least this
@@ -109,14 +105,13 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
 
         self.columnCount = columnCount
         self.cellsPerColumn = cellsPerColumn
-        self.initialPermanence = initialPermanence
         self.minThreshold = minThreshold
         self.maxSegmentsPerCell = maxSegmentsPerCell
         self.basalInputSize = basalInputSize
         self.apicalInputSize = apicalInputSize
         self.noise = noise
         self.learningRate = learningRate
-        self.useApicalTiebreak = useApicalTriebreak
+        self.useApicalTiebreak = useApicalTiebreak
 
         self.rng = Random(seed)
 
@@ -374,7 +369,10 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
         @return (numpy array)
         """
         if self.useApicalTiebreak:
-            pass
+            # Multiply both activities with each other, representing the joint probability of basal and apical input in
+            # this context. This fulfills all desired properties as we are weighting the input based on the information
+            # received from higher regions (e.g. here the output layer)
+            cell_activity = (activeBasalSegments * activeApicalSegments).max(axis=0)
         else:
             cell_activity = activeBasalSegments.max(axis=0)
 

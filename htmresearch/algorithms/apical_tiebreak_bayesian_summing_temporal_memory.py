@@ -56,13 +56,13 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
             basalInputSize=0,  # Must be non-equal zero
             apicalInputSize=0,  # Must be non-equal zero
             cellsPerColumn=32,
-            initialPermanence=0.21,
             # Changed to float
             minThreshold=0.5,
             sampleSize=20,
             noise=0.01,  # lambda
             learningRate=0.1,  # alpha
             maxSegmentsPerCell=255,
+            useApicalTiebreak=False,
             seed=42
     ):
         """
@@ -82,9 +82,6 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
     The activation threshold of basal (lateral) segments for cells that have
     active apical segments. If equal to activationThreshold (default),
     this parameter has no effect.
-
-    @param initialPermanence (float)
-    Initial permanence of a new synapse
 
     @param minThreshold (int)
     If the number of potential synapses active on a segment is at least this
@@ -111,12 +108,12 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
             basalInputSize=basalInputSize,
             apicalInputSize=apicalInputSize,
             cellsPerColumn=cellsPerColumn,
-            initialPermanence=initialPermanence,
             minThreshold=minThreshold,
             sampleSize=sampleSize,
             noise=noise,
             learningRate=learningRate,
             maxSegmentsPerCell=maxSegmentsPerCell,
+            useApicalTiebreak=useApicalTiebreak,
             seed=seed
         )
 
