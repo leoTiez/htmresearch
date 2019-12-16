@@ -103,3 +103,11 @@ Some of our old research code and experiments are archived in the following repo
 * Run `./deploy-n-test.sh` to run the test suite
 * Results are stored in /results , with the overlap-ratio (object_overlap/active_neurons) as filename, underscore a unique ID
 * The files contain the details about the execution parameters and overlap-results
+
+# Run remotely
+* If the files are transferred successfully simply connect to the instance via `gcloud compute ssh [INSTANCE_NAME]`
+* We use the tool [screen](https://www.gnu.org/software/screen/manual/screen.html#Overview) to run the script in the background and be able to detach from the session
+* run `screen` to start then execute the script in the directory with `./deploy-n-test.py`.
+* Detach from the session with STR+SHIFT+A and then D
+* To attach again and see the output screen -r
+* To leave the ssh session type `exit`
