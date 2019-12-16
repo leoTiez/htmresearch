@@ -63,7 +63,7 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
             noise=0.01,  # lambda
             learningRate=0.1,  # alpha
             maxSegmentsPerCell=255,
-            useApicalTriebreak=False,
+            useApicalTiebreak=False,
             seed=42
     ):
         """
@@ -116,7 +116,7 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
         self.apicalInputSize = apicalInputSize
         self.noise = noise
         self.learningRate = learningRate
-        self.useApicalTiebreak = useApicalTriebreak
+        self.useApicalTiebreak = useApicalTiebreak
 
         self.rng = Random(seed)
 
@@ -374,7 +374,10 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
         @return (numpy array)
         """
         if self.useApicalTiebreak:
-            pass
+            # Multiply both activities with each other, representing the joint probability of basal and apical input in
+            # this context. This fulfills all desired properties as we are weighting the input based on the information
+            # received from higher regions (e.g. here the output layer)
+            cell_activity = (activeBasalSegments * activeApicalSegments).max(axis=0)
         else:
             cell_activity = activeBasalSegments.max(axis=0)
 

@@ -63,6 +63,7 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
             noise=0.01,  # lambda
             learningRate=0.1,  # alpha
             maxSegmentsPerCell=255,
+            useApicalTiebreak=False,
             seed=42
     ):
         """
@@ -117,6 +118,7 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
             noise=noise,
             learningRate=learningRate,
             maxSegmentsPerCell=maxSegmentsPerCell,
+            useApicalTiebreak=useApicalTiebreak,
             seed=seed
         )
 

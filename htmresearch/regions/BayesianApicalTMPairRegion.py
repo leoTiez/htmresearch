@@ -246,6 +246,12 @@ class BayesianApicalTMPairRegion(PyRegion):
           "dataType": "Real32",
           "count": 1
         },
+        "useApicalTiebreak": {
+          "description": "Flag for using apical information",
+          "accessMode": "Read",
+          "dataType": "Bool",
+          "count": 1
+        },
         "seed": {
           "description": "Seed for the random number generator.",
           "accessMode": "Read",
@@ -283,6 +289,7 @@ class BayesianApicalTMPairRegion(PyRegion):
                seed=42,
                noise=0.01,  # lambda
                learningRate=0.1,  # alpha
+               useApicalTiebreak=False,
                # Region params
                implementation="BayesianApicalTiebreak",
                learn=True,
@@ -303,6 +310,7 @@ class BayesianApicalTMPairRegion(PyRegion):
     self.seed = seed
     self.noise = noise
     self.learningRate = learningRate
+    self.useApicalTiebreak = useApicalTiebreak
 
     # Region params
     self.implementation = implementation
@@ -332,6 +340,7 @@ class BayesianApicalTMPairRegion(PyRegion):
         "seed": self.seed,
         "noise": self.noise,
         "learningRate": self.learningRate,
+        "useApicalTiebreak": self.useApicalTiebreak
       }
 
       if self.implementation == "Bayesian":
