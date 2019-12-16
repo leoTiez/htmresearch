@@ -190,22 +190,6 @@ class BayesianApicalTMPairRegion(PyRegion):
           "count": 1,
           "constraints": ""
         },
-
-        "initialPermanence": {
-          "description": "Initial permanence of a new synapse.",
-          "accessMode": "Read",
-          "dataType": "Real32",
-          "count": 1,
-          "constraints": ""
-        },
-        "connectedPermanence": {
-          "description": ("If the permanence value for a synapse is greater "
-                          "than this value, it is said to be connected."),
-          "accessMode": "Read",
-          "dataType": "Real32",
-          "count": 1,
-          "constraints": ""
-        },
         "minThreshold": {
           "description": ("Minimal excitation of a segment required to be considered"
                           "to be active"),
@@ -281,7 +265,6 @@ class BayesianApicalTMPairRegion(PyRegion):
 
                # TM params
                cellsPerColumn=32,
-               initialPermanence=0.21,
                minThreshold=0.5,
                sampleSize=20,
                maxSegmentsPerCell=255,
@@ -302,7 +285,6 @@ class BayesianApicalTMPairRegion(PyRegion):
 
     # TM params
     self.cellsPerColumn = cellsPerColumn
-    self.initialPermanence = initialPermanence
     self.minThreshold = minThreshold
     self.sampleSize = sampleSize
     self.maxSegmentsPerCell = maxSegmentsPerCell
@@ -333,7 +315,6 @@ class BayesianApicalTMPairRegion(PyRegion):
         "basalInputSize": self.basalInputWidth,
         "apicalInputSize": self.apicalInputWidth,
         "cellsPerColumn": self.cellsPerColumn,
-        "initialPermanence": self.initialPermanence,
         "minThreshold": self.minThreshold,
         "sampleSize": self.sampleSize,
         "maxSegmentsPerCell": self.maxSegmentsPerCell,

@@ -56,7 +56,6 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
             basalInputSize=0,  # Must be non-equal zero
             apicalInputSize=0,  # Must be non-equal zero
             cellsPerColumn=32,
-            initialPermanence=0.21,
             # Changed to float
             minThreshold=0.5,
             sampleSize=20,
@@ -84,9 +83,6 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
         active apical segments. If equal to activationThreshold (default),
         this parameter has no effect.
 
-        @param initialPermanence (float)
-        Initial permanence of a new synapse
-
         @param minThreshold (int)
         If the number of potential synapses active on a segment is at least this
         threshold, it is said to be "matching" and is eligible for learning.
@@ -109,7 +105,6 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
 
         self.columnCount = columnCount
         self.cellsPerColumn = cellsPerColumn
-        self.initialPermanence = initialPermanence
         self.minThreshold = minThreshold
         self.maxSegmentsPerCell = maxSegmentsPerCell
         self.basalInputSize = basalInputSize
