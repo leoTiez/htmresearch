@@ -283,6 +283,7 @@ class L4L2Experiment(object):
         }
         self.config["L4Params"]["maxSegmentsPerCell"] = maxSegmentsPerCell
         self.config["L4Params"]["implementation"] = implementation
+        self.config["L2Params"]["implementation"] = implementation
 
     if enableLateralSP:
       self.config["lateralSPParams"] = self.getDefaultLateralSPParams(inputSize)
@@ -755,6 +756,12 @@ class L4L2Experiment(object):
     """
     return [set(column._pooler.getActiveCells()) for column in self.L2Columns]
 
+  def getL2Prediction(self):
+    """
+    Get the prediction per cortical column
+    """
+    return [set(column._pooler.getObjectPrediction()) for column in self.L2Columns]
+
 
   def getCurrentObjectOverlaps(self):
     """
@@ -904,7 +911,7 @@ class L4L2Experiment(object):
       "noise": 0.01,
       "learningRate": 0.1,
       "maxSegmentsPerCell": 10,
-      "implementation": "BayesianApicalTiebreak",
+      "implementation": "Bayesian",
       "seed": self.seed
     }
 
@@ -959,6 +966,11 @@ class L4L2Experiment(object):
       "noise": 0.01,  # lambda
       "learningRate": 0.1,  # alpha
       "activationThreshold": 0.5,  # used for cell activation & competition through distal segment activity
+      "forgetting": 0.1,
+      "useSupport": False,
+      "avoidWeightExplosion": True,
+      "resetProximalCounter": False,
+      "useProximalProbabilities": True
     }
 
   def getDefaultLateralSPParams(self, inputSize):

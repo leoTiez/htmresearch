@@ -459,7 +459,8 @@ class ApicalTiebreakBayesianTemporalMemory(object):
     # Runtime warnings for negative infinity can be ignored here
     activeMask = activeInput > 0
     # Only sum over active input -> otherwise large negative sum due to sparse activity and 0 inputs with noise
-    activation = np.log(np.multiply(weights[:, :, activeMask], activeInput[activeMask]) + noise)
+    # activation = np.log(np.multiply(weights[:, :, activeMask], activeInput[activeMask]) + noise)
+    activation = np.multiply(weights[:, :, activeMask], activeInput[activeMask]) + noise
     # Special case if active mask has no active inputs (e.g initialisation)
     # then activation becomes 0 and hence the exp of it 1
     activation = activation.sum(axis=2) if np.any(activeMask) else activation.sum(axis=2) + np.NINF
@@ -486,12 +487,13 @@ class ApicalTiebreakBayesianTemporalMemory(object):
 
   @staticmethod
   def _learn(connectionCount, activationCount, inputCount, updateCounter):
-    weights = connectionCount / np.outer(
+    weights = (connectionCount * updateCounter) / np.outer(
       activationCount,
       inputCount
     ).reshape(connectionCount.shape)
     # set division by zero to zero since this represents unused segments
     weights[np.isnan(weights)] = 0
+    weights = np.log(weights)
 
     # Unused segments are set to -inf. That is desired since we take the exp function for the activation
     # exp(-inf) = 0 what is the desired outcome

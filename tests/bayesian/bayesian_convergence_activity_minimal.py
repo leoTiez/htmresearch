@@ -61,7 +61,7 @@ def runExperiment():
 
   exp1 = L4L2Experiment(
     'single_column',
-    implementation='BayesianApicalTiebreak',
+    implementation='SummingBayesian',
     L2RegionType="py.BayesianColumnPoolerRegion",
     L4RegionType="py.BayesianApicalTMPairRegion",
     numCorticalColumns=1,
