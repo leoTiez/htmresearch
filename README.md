@@ -93,3 +93,13 @@ Some of our old research code and experiments are archived in the following repo
  
 * https://github.com/numenta-archive/htmresearch
 
+# Deployment remote
+
+* Follow the guide https://cloud.google.com/compute/docs/instances/connecting-to-instance to install gcloud command line tools
+* Set the project `gcloud compute ssh --project [PROJECT_ID] --zone [ZONE] [INSTANCE_NAME]`
+* Make sure to have the SSH key file for the service account
+* Connect to the instance via SSH `gcloud compute ssh [INSTANCE_NAME]`
+* Transfer files with `gcloud compute scp --recurse [LOCAL_DIR] [INSTANCE_NAME]:[REMOTE_DIR]` (only include changed files, to decrease waiting time)
+* Run `./deploy-n-test.sh` to run the test suite
+* Results are stored in /results , with the overlap-ratio (object_overlap/active_neurons) as filename, underscore a unique ID
+* The files contain the details about the execution parameters and overlap-results
