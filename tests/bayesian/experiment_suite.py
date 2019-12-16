@@ -29,6 +29,7 @@ def runExperiments():
     forgetting_p = [0.01, 0.1, 0.15]
     use_support_p = [True, False]
     use_proximal_probabilities_p = [True, False]
+    use_apical_tiebreak_p = [True, False]
 
     for num_columns in num_columns_p:
         for implementation in implementation_p:
@@ -39,62 +40,64 @@ def runExperiments():
                             for forgetting in forgetting_p:
                                 for use_support in use_support_p:
                                     for use_proximal_probabilities in use_proximal_probabilities_p:
-                                        L2Overrides = {
-                                            "noise": 1e-8,
-                                            "cellCount": 512,  # new: 256 # original: 4096
-                                            "inputWidth": cells_per_column * columns_count,  # new: 8192 # original: 16384 (?) = cells per column * column count
-                                            "sdrSize": sdrSize,
-                                            "useProximalProbabilities": use_proximal_probabilities,
-                                            "avoidWeightExplosion": True,
-                                            "useSupport": use_support,
-                                            "seed": seed,
-                                            "learningMode": True,
-                                            "learningRate": learning_rate_l2,  # alpha
-                                            "activationThreshold": activation_threshold,  # used for cell activation & competition through distal segment activity
-                                            "forgetting": forgetting,
-                                            "resetProximalCounter": False,
-                                        }
+                                        for use_apical_tiebreak in use_apical_tiebreak_p:
+                                            L2Overrides = {
+                                                "noise": 1e-8,
+                                                "cellCount": 512,  # new: 256 # original: 4096
+                                                "inputWidth": cells_per_column * columns_count,  # new: 8192 # original: 16384 (?) = cells per column * column count
+                                                "sdrSize": sdrSize,
+                                                "useProximalProbabilities": use_proximal_probabilities,
+                                                "avoidWeightExplosion": True,
+                                                "useSupport": use_support,
+                                                "seed": seed,
+                                                "learningMode": True,
+                                                "learningRate": learning_rate_l2,  # alpha
+                                                "activationThreshold": activation_threshold,  # used for cell activation & competition through distal segment activity
+                                                "forgetting": forgetting,
+                                                "resetProximalCounter": False,
+                                            }
 
-                                        L4Overrides = {
-                                            "noise": 1e-8,
-                                            "cellsPerColumn": cells_per_column,  # new: 4 # original 32
-                                            "columnCount": columns_count,  # new: 2048 # original: 2048
-                                            "minThreshold": min_threshold,
-                                            "learn": True,
-                                            "sampleSize": 40,
-                                            "learningRate": learning_rate_l4,
-                                            "maxSegmentsPerCell": maxNumSegments,
-                                            "implementation": "Bayesian",
-                                            "seed": seed
-                                        }
+                                            L4Overrides = {
+                                                "noise": 1e-8,
+                                                "cellsPerColumn": cells_per_column,  # new: 4 # original 32
+                                                "columnCount": columns_count,  # new: 2048 # original: 2048
+                                                "minThreshold": min_threshold,
+                                                "learn": True,
+                                                "sampleSize": 40,
+                                                "useApicalTiebreak": use_apical_tiebreak,
+                                                "learningRate": learning_rate_l4,
+                                                "maxSegmentsPerCell": maxNumSegments,
+                                                "implementation": "Bayesian",
+                                                "seed": seed
+                                            }
 
-                                        title = 'Experiment with config \n\tL2Overrides=%s \n\tL4Overrides=%s \n\tImplementation=%s \n\tnumCC=%s' % (L2Overrides, L4Overrides, implementation, num_columns)
-                                        id = hash(title)
-                                        print "\n\n#################################\n", title
-                                        exp = L4L2Experiment(
-                                            title,
-                                            implementation=implementation,
-                                            L2RegionType="py.BayesianColumnPoolerRegion",
-                                            L4RegionType="py.BayesianApicalTMPairRegion",
-                                            numCorticalColumns=num_columns,
-                                            maxSegmentsPerCell=maxNumSegments,
-                                            seed=1,
-                                            L2Overrides=L2Overrides,
-                                            L4Overrides=L4Overrides,
-                                        )
+                                            title = 'Experiment with config \n\tL2Overrides=%s \n\tL4Overrides=%s \n\tImplementation=%s \n\tnumCC=%s' % (L2Overrides, L4Overrides, implementation, num_columns)
+                                            id = hash(title)
+                                            print "\n\n#################################\n", title
+                                            exp = L4L2Experiment(
+                                                title,
+                                                implementation=implementation,
+                                                L2RegionType="py.BayesianColumnPoolerRegion",
+                                                L4RegionType="py.BayesianApicalTMPairRegion",
+                                                numCorticalColumns=num_columns,
+                                                maxSegmentsPerCell=maxNumSegments,
+                                                seed=1,
+                                                L2Overrides=L2Overrides,
+                                                L4Overrides=L4Overrides,
+                                            )
 
-                                        with warnings.catch_warnings():
-                                            if (suppressWarnings):
-                                                warnings.simplefilter("ignore")
-                                            results = runExperiment(exp, num_columns)
+                                            with warnings.catch_warnings():
+                                                if (suppressWarnings):
+                                                    warnings.simplefilter("ignore")
+                                                results = runExperiment(exp, num_columns)
 
-                                            filename = 'results/%s_%s.json' % (results["bestOverlapRatio"], id)
-                                            if not os.path.exists('results'):
-                                                os.makedirs('results')
-                                            with open(filename, 'w') as outfile:
-                                                json.dump(results, outfile, indent=4)
+                                                filename = 'results/%s_%s.json' % (results["bestOverlapRatio"], id)
+                                                if not os.path.exists('results'):
+                                                    os.makedirs('results')
+                                                with open(filename, 'w') as outfile:
+                                                    json.dump(results, outfile, indent=4)
 
-                                        print "\n#################################"
+                                            print "\n#################################"
 
 """
   Minimal version of the convergence_activity experiment from the htmpapers/frontiers repository.
