@@ -52,7 +52,7 @@ def test_summing_bayesian():
     numLearningPoints = 3
     maxNumSegments = 5
     columns_count = 2048
-    cells_per_column = 8
+    cells_per_column = 16
 
     # Create objects
     num_objects = 10
@@ -62,19 +62,24 @@ def test_summing_bayesian():
     # Recognition
     rec_object = 1
     repetition = 3
+    use_noise = True
+    noise = 1
 
     L2Overrides = {
         "noise": 1e-8,
         "cellCount": 512,  # new: 256 # original: 4096
         "inputWidth": cells_per_column * columns_count,  # new: 8192 # original: 16384 (?) = cells per column * column count
-        "sdrSize": 40
+        "sdrSize": 70,
+        "useProximalProbabilities": False,
+        "avoidWeightExplosion": True,
+        "useSupport": True
     }
 
     L4Overrides = {
         "noise": 1e-8,
         "cellsPerColumn": cells_per_column,  # new: 4 # original 32
         "columnCount": columns_count,  # new: 2048 # original: 2048
-        "minThreshold": 0.1,
+        "minThreshold": 0.1
     }
 
     exp1 = L4L2Experiment(
@@ -90,7 +95,7 @@ def test_summing_bayesian():
         seed=1
     )
 
-    objects, noise_objects = create_object_single(num_objects, num_of_sensations, num_of_input, 1024) # TODO Why 1024
+    objects, noise_objects = create_object_single(num_objects, num_of_sensations, num_of_input, 1024, noise=noise) # TODO Why 1024
 
     # learn the sensations
     print "Train objects"
@@ -102,9 +107,10 @@ def test_summing_bayesian():
         rep = exp1.objectL2Representations[o][0]
         object_representations.append(rep)
 
+    objs_recognition = objects if not use_noise else noise_objects
     for _ in range(repetition):
-        np.random.shuffle(noise_objects[rec_object])
-        for num, sensation in enumerate(noise_objects[rec_object]):
+        np.random.shuffle(objs_recognition[rec_object])
+        for num, sensation in enumerate(objs_recognition[rec_object]):
             exp1.infer([sensation], objectName=rec_object, reset=False)
 
             object_prediction = exp1.getL2Prediction()[0]
