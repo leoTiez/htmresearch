@@ -64,6 +64,7 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemoryBase)
             learningRate=0.1,  # alpha
             maxSegmentsPerCell=255,
             initMovingAverages=0.0,
+            useApicalTiebreak=False,
             seed=42
     ):
         """
@@ -117,6 +118,7 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemoryBase)
             noise=noise,
             learningRate=learningRate,
             maxSegmentsPerCell=maxSegmentsPerCell,
+            useApicalTiebreak=useApicalTiebreak,
             seed=seed
         )
 
