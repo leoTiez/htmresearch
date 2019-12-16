@@ -69,7 +69,7 @@ def test_summing_bayesian():
         "noise": 1e-8,
         "cellCount": 512,  # new: 256 # original: 4096
         "inputWidth": cells_per_column * columns_count,  # new: 8192 # original: 16384 (?) = cells per column * column count
-        "sdrSize": 70,
+        "sdrSize": 40,
         "useProximalProbabilities": False,
         "avoidWeightExplosion": True,
         "useSupport": True
@@ -79,7 +79,8 @@ def test_summing_bayesian():
         "noise": 1e-8,
         "cellsPerColumn": cells_per_column,  # new: 4 # original 32
         "columnCount": columns_count,  # new: 2048 # original: 2048
-        "minThreshold": 0.1
+        "minThreshold": 0.1,
+        "useApicalTiebreak": True
     }
 
     exp1 = L4L2Experiment(
