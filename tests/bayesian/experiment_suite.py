@@ -207,8 +207,8 @@ def runExperiment(exp, numColumns):
           l2Representation = l2ActiveCells[idx][0]
           overlap = len(l2Representation.intersection(object))
           overlaps[idx][i] = "%s/%s" % (overlap, len(l2Representation))
-          if (overlap/len(l2Representation) > bestOverlapRatio):
-              bestOverlapRatio = overlap/len(l2Representation)
+          if (overlap*1.0/len(l2Representation) > bestOverlapRatio):
+              bestOverlapRatio = overlap*1.0/len(l2Representation)
           print "\tTo object %s is %s/%s" % (i, overlap, len(l2Representation))
 
   result = {
