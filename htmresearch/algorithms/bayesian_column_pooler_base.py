@@ -163,7 +163,9 @@ class BayesianColumnPoolerBase(object):
         self.sampleSizeDistal = sampleSizeDistal
         self.inertiaFactor = inertiaFactor
 
+        self.prevActiveCells = np.zeros(self.cellCount, dtype="float64")
         self.activeCells = np.zeros(self.cellCount, dtype="float64")
+        self.activePredictionCells = np.zeros(self.cellCount, dtype="float64")
         self._random = Random(seed)
         self.useInertia=True
 
@@ -194,7 +196,10 @@ class BayesianColumnPoolerBase(object):
         Reset internal states. When learning this signifies we are to learn a
         unique new object.
         """
+        self.prevActiveCells = np.zeros(self.cellCount, dtype="float64")
         self.activeCells = np.zeros(self.cellCount, dtype="float64")
+        self.activePredictionCells = np.zeros(self.cellCount, dtype="float64")
+
 
     def compute(
             self,
@@ -326,7 +331,7 @@ class BayesianColumnPoolerBase(object):
         self.proximalBias = self._learn(connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["proximal"])
 
         if VERBOSITY > 1:
-            act = self._activation(self.proximalWeights,feedforwardInput, self.proximalBias, self.noise)
+            act = self._activation(self.proximalWeights, feedforwardInput, self.proximalBias, self.noise)
             print "Activation with current weights in learning", act[act > 0]
 
         # External distal learning
@@ -356,6 +361,9 @@ class BayesianColumnPoolerBase(object):
                 input bits
         """
 
+        # Calculate support to t-1 activated cells to infer object at time t
+        self.prevActiveCells = self.activeCells.copy()
+
         # Calculate the feed forward activation
         # Support is only added if a prediction needs to be made
         feedForwardActivation = self._activation(self.proximalWeights, feedforwardInput, self.proximalBias, self.noise)
@@ -367,6 +375,21 @@ class BayesianColumnPoolerBase(object):
         self.activeCells[
             feedForwardActivation > 0.0
             ] = feedForwardActivation[feedForwardActivation > 0.0] if self.useProximalProbabilities else 1
+
+
+        # Compute activePredition cells based on activity and support
+        activity = self.activeCells.copy()
+
+        if self.useSupport:
+            # first touch has no previous activation => exclude
+            if (np.any(self.prevActiveCells)):
+                activity *= self._activation(self.internalDistalWeights, self.prevActiveCells, self.internalDistalBias,
+                                             self.noise)
+
+            for i, lateralInput in enumerate(lateralInputs):
+                activity *= self._activation(self.distalWeights[i], lateralInput, self.distalBias[i], self.noise)
+
+        self.activePredictionCells = activity
 
         if VERBOSITY > 1:
             print "Column pooler inference input", feedforwardInput.nonzero()
@@ -408,10 +431,16 @@ class BayesianColumnPoolerBase(object):
         activation = np.multiply(weights[:, activeMask], input[activeMask]) + noise
         # Special case if active mask has no active inputs (e.g initialisation)
         # then activation becomes 0 and hence the exp of it 1
-        if not ignoreNinf:
-            activation = activation.sum(axis=1) if np.any(activeMask) else activation.sum(axis=1) + np.NINF
-        else:
-            activation = np.ma.masked_invalid(activation).sum(axis=1) if np.any(activeMask) else activation.sum(axis=1) + np.NINF
+        # if not ignoreNinf:
+        #     activation = activation.sum(axis=1) if np.any(activeMask) else activation.sum(axis=1) + np.NINF
+        # else:
+        #     activation = np.ma.masked_invalid(activation).sum(axis=1) if np.any(activeMask) else activation.sum(axis=1) + np.NINF
+
+        # Set explicitly to zero to avoid summing NINF if only one connection is non-existend for a neuron (because multiple objects are activated and only overlapping would be inferred)
+        activation[activation == np.NINF] = 0
+        activation = activation.sum(axis=1) if np.any(activeMask) else activation.sum(axis=1) + np.NINF
+        activation[activation == 0] = np.NINF
+
         activation = activation if not useBias else activation + bias
         return np.exp(activation)
 
@@ -463,18 +492,31 @@ class BayesianColumnPoolerBase(object):
         # return np.where(self.activeCells >= self.activationThreshold)[0]
         return np.nonzero(self.activeCells)[0]
 
-    def getObjectPrediction(self):
+    def getObjectPredictionEntropyTimestepT(self):
         """
         :returns: Prediction of the most probable object
         """
         # If support is used, activity is no probabilities anymore
-        # THus the threshold can be lower than 0
+        # Thus the threshold can be lower than 0
         activity = self.activeCells if not self.useSupport else self._supportedActivation(self.activeCells,
                                                                                           self.internalDistalWeights)
         threshold = 0.0 if not self.useSupport else np.NINF
 
         # No probabilities anymore, thus do not filter for values greater than 0
         zippedActivation = filter(lambda x: x[1] > threshold, zip(range(len(activity)), activity))
+        zippedActivation.sort(key=lambda t: t[1])
+        zippedActivation.reverse()
+        indices, support = zip(*zippedActivation[:self.sdrSize])
+
+        return list(indices)
+
+    def getObjectPrediction(self):
+        """
+        :returns: Prediction of the most probable object
+        """
+
+        # Probabilities of activation and support
+        zippedActivation = filter(lambda x: x[1] > 0.0, zip(range(len(self.activePredictionCells)), self.activePredictionCells))
         zippedActivation.sort(key=lambda t: t[1])
         zippedActivation.reverse()
         indices, support = zip(*zippedActivation[:self.sdrSize])

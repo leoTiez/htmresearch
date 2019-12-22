@@ -472,14 +472,15 @@ class BayesianColumnPoolerRegion(PyRegion):
       elif self.implementation == "SummingBayesian":
         from htmresearch.algorithms.bayesian_summing_column_pooler import BayesianSummingColumnPooler as cls
 
-        params["forgetting"] = self.forgetting
-        params["useSupport"] = self.useSupport
-        params["avoidWeightExplosion"] = self.avoidWeightExplosion
-        params["resetProximalCounter"] = self.resetProximalCounter
-        params["useProximalProbabilities"] = self.useProximalProbabilities
-
       else:
         raise ValueError("Unrecognized implementation %s" % self.implementation)
+
+      # Params are needed in both implementations (base version)
+      params["forgetting"] = self.forgetting
+      params["useSupport"] = self.useSupport
+      params["avoidWeightExplosion"] = self.avoidWeightExplosion
+      params["resetProximalCounter"] = self.resetProximalCounter
+      params["useProximalProbabilities"] = self.useProximalProbabilities
 
       self._pooler = cls(**params)
 

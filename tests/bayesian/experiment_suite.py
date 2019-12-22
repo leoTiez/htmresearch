@@ -91,7 +91,7 @@ def runExperiments():
                                                     warnings.simplefilter("ignore")
                                                 results = runExperiment(exp, num_columns)
 
-                                                filename = 'results/%s_%s.json' % (results["bestOverlapRatio"], id)
+                                                filename = 'results/%s_%s_%s.json' % (results["convergedSteps"], results["bestOverlapRatio"], id)
                                                 if not os.path.exists('results'):
                                                     os.makedirs('results')
                                                 with open(filename, 'w') as outfile:
@@ -172,17 +172,18 @@ def runExperiment(exp, numColumns):
 
   print "inference "
   exp.sendReset()
+
+  # 1.) Inference: Get active predictions for each sensation/location input
   l2ActiveCells = []
-  L2ActiveCellNVsTime = []
   for sensation in sensationSteps:
     exp.infer([sensation], objectName=objectId, reset=False)
-    rep = exp.getL2Representations()
+    rep = exp.getL2Prediction()
     l2ActiveCells.append(rep)
     activeCellNum = 0
     for c in range(numColumns):
         activeCellNum += len(rep[c])
-    L2ActiveCellNVsTime.append(activeCellNum / numColumns)
 
+  # 2.) Save active cells of first object for convergence test (and possible drawing)
   # Used to figure out where to put the red rectangle!
   sdrSize = exp.config["L2Params"]["sdrSize"]
   singleColumnHighlight = next(
@@ -196,6 +197,7 @@ def runExperiment(exp, numColumns):
   print "Exactly SDR-Size activity (%s) after %s steps" % (sdrSize, singleColumnHighlight)
   print "Converged to first object representation after %s steps" % converged
 
+  # 3.) Iterate over all active predictions and print the overlap to all objects
   print "Overlaps of each l2-representation (after new sensation) to each object"
   overlaps = {}
   bestOverlapRatio = 0

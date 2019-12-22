@@ -107,7 +107,7 @@ Some of our old research code and experiments are archived in the following repo
 # Run remotely
 * If the files are transferred successfully simply connect to the instance via `gcloud compute ssh [INSTANCE_NAME]`
 * We use the tool [screen](https://www.gnu.org/software/screen/manual/screen.html#Overview) to run the script in the background and be able to detach from the session
-* run `screen` to start then execute the script in the directory with `./deploy-n-test.py`.
+* run `screen` to start then execute the script in the directory with `./deploy-n-test.sh`.
 * Detach from the session with STR+SHIFT+A and then D
 * To attach again and see the output screen -r
 * To leave the ssh session type `exit`
