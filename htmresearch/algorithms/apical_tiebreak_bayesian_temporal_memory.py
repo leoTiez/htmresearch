@@ -125,6 +125,9 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemoryBase)
             (self.numApicalSegments, self.numberOfCells(), self.apicalInputSize),
             initMovingAverages
         )
+        if initMovingAverages == 0:
+            initMovingAverages = self.noise**2
+
         self.basalMovingAveragesBias = np.full((self.numBasalSegments, self.numberOfCells()), initMovingAverages)
         self.apicalMovingAveragesBias = np.full((self.numApicalSegments, self.numberOfCells()), initMovingAverages)
         self.basalMovingAverageInput = np.full(self.basalInputSize, initMovingAverages)
