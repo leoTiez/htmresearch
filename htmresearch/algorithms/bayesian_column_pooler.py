@@ -168,6 +168,9 @@ class BayesianColumnPooler(BayesianColumnPoolerBase):
         # self.internalDistalWeights[:, :] = np.random.random(self.internalDistalWeights[:, :].shape)
         # self.proximalWeights[:, :] = np.random.random(self.proximalWeights[:, :].shape)
 
+        if initMovingAverages == 0:
+            initMovingAverages = self.noise**2
+
         self.distalMovingAverages = list(np.full((self.cellCount, n), initMovingAverages) for n in lateralInputWidths)
         self.internalDistalMovingAverages = np.full((self.cellCount, self.cellCount), initMovingAverages)
         self.proximalMovingAverages = np.full((self.cellCount, self.inputWidth), initMovingAverages)
