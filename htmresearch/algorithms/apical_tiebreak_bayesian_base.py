@@ -207,6 +207,7 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
         @param apicalInput (numpy array)
         List of active input bits for the apical dendrite segments
         """
+
         activation_basal = self._calculateSegmentActivity(
             self.basalWeights,
             basalInput,
@@ -219,11 +220,9 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
             apicalInput,
             self.apicalBias,
             self.noise,
-            use_bias=False
+            use_bias=True
         )
 
-        activation_basal = np.exp(activation_basal)
-        activation_apical = np.exp(activation_apical)
         self.predictedCells = self._calculatePredictedValues(activation_basal, activation_apical)
         self.activeBasalSegments = activation_basal
         self.activeApicalSegments = activation_apical
@@ -410,15 +409,11 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
 
     @staticmethod
     def _calculateSegmentActivity(weights, activeInput, bias, noise, use_bias=True):
-        # Runtime warnings for negative infinity can be ignored here
-        activeMask = activeInput > 0
-        # Only sum over active input -> otherwise large negative sum due to sparse activity and 0 inputs with noise
-        # activation = np.log(np.multiply(weights[:, :, activeMask], activeInput[activeMask]) + noise)
-        activation = np.multiply(weights[:, :, activeMask], activeInput[activeMask]) + noise
-        # Special case if active mask has no active inputs (e.g initialisation)
-        # then activation becomes 0 and hence the exp of it 1
-        activation = activation.sum(axis=2) if np.any(activeMask) else activation.sum(axis=2) + np.NINF
-        return activation if not use_bias else activation + bias
+        # It's changed in the weight update rules that none of the weight values is set to -inf.
+        # Thus we can easily use simple matrix multiplication
+        # We normalise the input to avoid activation explosion
+        transformedActivation = activeInput / float(activeInput.shape[0])
+        return np.exp(weights.dot(transformedActivation)) if not use_bias else np.exp(weights.dot(transformedActivation) + bias)
 
     ###################################################################################################################
     # Reshape methods
