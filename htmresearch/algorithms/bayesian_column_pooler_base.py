@@ -401,18 +401,10 @@ class BayesianColumnPoolerBase(object):
 
     @staticmethod
     def _activation(weights, input, bias, noise, useBias=True, ignoreNinf=False):
-        # Runtime warnings for negative infinity can be ignored here
-        activeMask = input > 0
-        # Only sum over active input -> otherwise large negative sum due to sparse activity and 0 inputs with noise
-        # activation = np.log(np.multiply(weights[:, activeMask], input[activeMask]) + noise)
-        activation = np.multiply(weights[:, activeMask], input[activeMask]) + noise
-        # Special case if active mask has no active inputs (e.g initialisation)
-        # then activation becomes 0 and hence the exp of it 1
-        if not ignoreNinf:
-            activation = activation.sum(axis=1) if np.any(activeMask) else activation.sum(axis=1) + np.NINF
-        else:
-            activation = np.ma.masked_invalid(activation).sum(axis=1) if np.any(activeMask) else activation.sum(axis=1) + np.NINF
-        activation = activation if not useBias else activation + bias
+        # To avoid explosion of activation value the input is normalised
+        # It's made sure that all weight values are set. Hence we can make use of simple matrix multiplication
+        transformed_input = input / float(input.shape[0])
+        activation = weights.dot(transformed_input) if not useBias else weights.dot(transformed_input) + bias
         return np.exp(activation)
 
     @staticmethod
