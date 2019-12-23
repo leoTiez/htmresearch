@@ -380,7 +380,6 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
     def _learn(self, isBasal=True):
         weights = self._updateWeights(isBasal=isBasal)
         # set division by zero to zero since this represents unused segments
-        weights[np.isnan(weights)] = 0
         weights = np.log(weights)
 
         # Unused segments are set to -inf. That is desired since we take the exp function for the activation
