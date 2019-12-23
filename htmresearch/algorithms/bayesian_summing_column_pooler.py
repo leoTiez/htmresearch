@@ -174,11 +174,12 @@ class BayesianSummingColumnPooler(BayesianColumnPoolerBase):
         self.numberOfObjects = 0
 
     def _beforeUpdate(self, connectionIndicator):
-        if connectionIndicator == self.CONNECTION_ENUM["internalDistal"]:
-            if self.avoidWeightExplosion:
-                self.updateCounter = 0
-            if self.resetProximalCounter:
-                self._resetProximalCounter()
+        pass
+        # if connectionIndicator == self.CONNECTION_ENUM["internalDistal"]:
+        #     if self.avoidWeightExplosion:
+        #         self.updateCounter = 0
+        #     if self.resetProximalCounter:
+        #         self._resetProximalCounter()
 
     def _updateConnectionData(self, connectionIndicator, **kwargs):
         if connectionIndicator == self.CONNECTION_ENUM["proximal"]:
@@ -250,6 +251,8 @@ class BayesianSummingColumnPooler(BayesianColumnPoolerBase):
             activationCount,
             inputCount
         ).reshape(connectionCount.shape)
+        weights[weights == 0] = 1. / float(updateCounter)
+        weights[np.isnan(weights)] = 1.
 
         return weights
 
