@@ -388,7 +388,6 @@ class BayesianColumnPoolerBase(object):
     def _learn(self, connectionIndicator, **kwargs):
         weights = self._updateWeights(connectionIndicator=connectionIndicator, **kwargs)
         # set division by zero to zero since this represents unused segments
-        weights[np.isnan(weights)] = 0
         weights = np.log(weights)
 
         bias = self._updateBias(connectionIndicator=connectionIndicator, **kwargs)
