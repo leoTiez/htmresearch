@@ -18,6 +18,7 @@ class BayesianCPTest(unittest.TestCase):
             "inputWidth": 8192,  # new: 8192 # original: 16384 (?)
             "sdrSize": 5,
             "activationThreshold": 0.01,
+            "useSupport": True
         }
 
         L4Overrides = {
