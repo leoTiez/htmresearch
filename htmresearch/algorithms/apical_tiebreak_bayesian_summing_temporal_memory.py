@@ -117,12 +117,12 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
             seed=seed
         )
 
-        self.basalConnectionCount = np.zeros((1, self.numberOfCells(), self.basalInputSize))
-        self.apicalConnectionCount = np.zeros((1, self.numberOfCells(), self.apicalInputSize))
-        self.basalSegmentActivationCount = np.zeros(self.numberOfCells())
-        self.apicalSegmentActivationCount = np.zeros(self.numberOfCells())
-        self.basalInputCount = np.zeros(self.basalInputSize)
-        self.apicalInputCount = np.zeros(self.apicalInputSize)
+        self.basalConnectionCount = np.zeros((1, self.numberOfCells(), self.basalInputSize), dtype='int64')
+        self.apicalConnectionCount = np.zeros((1, self.numberOfCells(), self.apicalInputSize), dtype='int64')
+        self.basalSegmentActivationCount = np.zeros(self.numberOfCells(), dtype='int64')
+        self.apicalSegmentActivationCount = np.zeros(self.numberOfCells(), dtype='int64')
+        self.basalInputCount = np.zeros(self.basalInputSize, dtype='int64')
+        self.apicalInputCount = np.zeros(self.apicalInputSize, dtype='int64')
         self.updateCounter = 0
 
     def _addNewSegments(self, isBasal=True):
@@ -145,24 +145,24 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
             numSegments += 1
 
     def _updateConnectionData(self, isBasal=True):
-      numSegments = self.numBasalSegments if isBasal else self.numApicalSegments
-      segments = self.activeBasalSegments if isBasal else self.activeApicalSegments
-      inputValues = self.basalInput if isBasal else self.apicalInput
-      connectionCount = self.basalConnectionCount if isBasal else self.apicalConnectionCount
-      segmentActivityCount = self.basalSegmentActivationCount if isBasal else self.apicalSegmentActivationCount
-      inputCount = self.basalInputCount if isBasal else self.apicalInputCount
+        numSegments = self.numBasalSegments if isBasal else self.numApicalSegments
+        segments = self.activeBasalSegments if isBasal else self.activeApicalSegments
+        inputValues = self.basalInput if isBasal else self.apicalInput
+        connectionCount = self.basalConnectionCount if isBasal else self.apicalConnectionCount
+        segmentActivityCount = self.basalSegmentActivationCount if isBasal else self.apicalSegmentActivationCount
+        inputCount = self.basalInputCount if isBasal else self.apicalInputCount
 
-      # Updating moving average weights to input
-      connection_matrix = np.outer(segments, inputValues)
-      # Consider only active segments
-      connection_matrix = connection_matrix.reshape(numSegments, self.numberOfCells(), connectionCount.shape[-1])
-      connectionCount += connection_matrix
+        # Updating moving average weights to input
+        connection_matrix = np.outer(segments, inputValues)
+        # Consider only active segments
+        connection_matrix = connection_matrix.reshape(numSegments, self.numberOfCells(), connectionCount.shape[-1])
+        connectionCount += connection_matrix.astype('int64')
 
-      # Updating moving average bias of each segment
-      segmentActivityCount += segments.reshape(-1)
+        # Updating moving average bias of each segment
+        segmentActivityCount += segments.reshape(-1).astype('int64')
 
-      # Updating moving average input activity
-      inputCount += inputValues.reshape(-1)
+        # Updating moving average input activity
+        inputCount += inputValues.reshape(-1).astype('int64')
 
     def _afterUpdate(self):
         self.updateCounter += 1
@@ -172,11 +172,12 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
         activationCount = self.basalSegmentActivationCount if isBasal else self.apicalSegmentActivationCount
         inputCount = self.basalInputCount if isBasal else self.apicalInputCount
 
-        weights = (connectionCount * self.updateCounter) / np.outer(
+        weights = (connectionCount.astype('float64') * self.updateCounter) / np.outer(
             activationCount,
             inputCount
-        ).reshape(connectionCount.shape)
-
+        ).reshape(connectionCount.shape).astype('float64')
+        weights[weights == 0] = 1. / float(self.updateCounter)
+        weights[np.isnan(weights)] = 1.
         return weights
 
     def _updateBias(self, isBasal=True):
