@@ -60,7 +60,7 @@ class BayesianColumnPoolerBase(object):
             avoidWeightExplosion=True,
             resetProximalCounter=False,
             useProximalProbabilities=True,
-            seed=42
+            seed=42,
     ):
         """
         Parameters:
@@ -395,19 +395,6 @@ class BayesianColumnPoolerBase(object):
             print "Column pooler inference input", feedforwardInput.nonzero()
             print "Column pooler activation output", self.activeCells[self.activeCells.nonzero()[0]]
 
-    def _supportedActivation(self, activation, distalWeights):
-        """
-        Introduce concept of mutual entropy (similar to mutual information)
-        activation_j = sum( - activation_i * E(log(w_ij)))
-        :returns: mutual entropy
-        """
-        # Mask invalid values since it would otherwise lead to all values equal -inf
-        weights = np.ma.masked_invalid(distalWeights)
-        supportedActivation = weights.dot(activation)
-        mask = np.ma.getmask(supportedActivation)
-        supportedActivation[mask] = np.NINF
-        return supportedActivation
-
     def _learn(self, connectionIndicator, **kwargs):
         weights = self._updateWeights(connectionIndicator=connectionIndicator, **kwargs)
         # set division by zero to zero since this represents unused segments
@@ -492,31 +479,17 @@ class BayesianColumnPoolerBase(object):
         # return np.where(self.activeCells >= self.activationThreshold)[0]
         return np.nonzero(self.activeCells)[0]
 
-    def getObjectPredictionEntropyTimestepT(self):
+    def getObjectPrediction(self):
         """
         :returns: Prediction of the most probable object
         """
         # If support is used, activity is no probabilities anymore
         # Thus the threshold can be lower than 0
-        activity = self.activeCells if not self.useSupport else self._supportedActivation(self.activeCells,
-                                                                                          self.internalDistalWeights)
+        activity = self.activeCells if not self.useSupport else self.activePredictionCells
         threshold = 0.0 if not self.useSupport else np.NINF
 
         # No probabilities anymore, thus do not filter for values greater than 0
         zippedActivation = filter(lambda x: x[1] > threshold, zip(range(len(activity)), activity))
-        zippedActivation.sort(key=lambda t: t[1])
-        zippedActivation.reverse()
-        indices, support = zip(*zippedActivation[:self.sdrSize])
-
-        return list(indices)
-
-    def getObjectPrediction(self):
-        """
-        :returns: Prediction of the most probable object
-        """
-
-        # Probabilities of activation and support
-        zippedActivation = filter(lambda x: x[1] > 0.0, zip(range(len(self.activePredictionCells)), self.activePredictionCells))
         zippedActivation.sort(key=lambda t: t[1])
         zippedActivation.reverse()
         indices, support = zip(*zippedActivation[:self.sdrSize])
