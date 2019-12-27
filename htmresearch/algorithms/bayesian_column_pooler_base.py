@@ -377,7 +377,7 @@ class BayesianColumnPoolerBase(object):
 
         if self.useSupport:
             # first touch has no previous activation => exclude
-            if (np.any(self.prevActiveCells)):
+            if np.any(self.prevActiveCells):
                 activity *= self._activation(self.internalDistalWeights, self.prevActiveCells, self.internalDistalBias,
                                              self.noise)
 
@@ -419,7 +419,7 @@ class BayesianColumnPoolerBase(object):
     def _activation(weights, input, bias, noise, useBias=True, ignoreNinf=False):
         # To avoid explosion of activation value the input is normalised
         # It's made sure that all weight values are set. Hence we can make use of simple matrix multiplication
-        transformed_input = input / float(input.shape[0])
+        transformed_input = input / float(input.sum())
         activation = weights.dot(transformed_input) if not useBias else weights.dot(transformed_input) + bias
         return np.exp(activation)
 
