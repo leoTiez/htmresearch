@@ -246,7 +246,7 @@ def plotL2ObjectRepresentations(exp1):
 
 
 
-def runExperiment():
+def runExperiment(numOfRuns):
   """
   We will run two experiments side by side, with either single column
   or 3 columns
@@ -255,15 +255,15 @@ def runExperiment():
   numFeatures = 3 # new: 3 # original: 3
   numPoints = 5 # new: 5 # original: 10
   numLocations = 5 # new: 5 # original: 10
-  numObjects = 4 # new: 2 # original: 10
-  numRptsPerSensation = 2
+  numObjects = 3 # new: 2 # original: 10
+  numRptsPerSensation = 1
 
   objectMachine = createObjectMachine(
     machineType="simple",
     numInputBits=20,
     sensorInputSize=1024,
     externalInputSize=1024,
-    numCorticalColumns=3,
+    numCorticalColumns=1,
     seed=40,
   )
   objectMachine.createRandomObjects(numObjects, numPoints=numPoints,
@@ -280,25 +280,31 @@ def runExperiment():
       featureLocations.append({0: objects[i][j][0]})
     objectsSingleColumn[i] = featureLocations
 
+  cellsPerColumn = 4
+  outputCells = 128
   # params
   maxNumSegments = 10
   L2Overrides = {
     "learningRate": 0.01,
-    "noise": 1e-8,
-    "cellCount": 1024, # new: 256 # original: 4096
-    "inputWidth": 8192, # new: 8192 # original: 16384 (?)
-    "activationThreshold": 0.01,
-    "sdrSize": 40,
+    "noise": 1e-10,
+    "cellCount": outputCells, # new: 256 # original: 4096
+    "inputWidth": 2048 * cellsPerColumn, # new: 8192 # original: 16384 (?)
+    "activationThreshold": 0.4,
+    "sdrSize": 5,
     "forgetting": 0.1,
-    "useSupport": True
+    "initMovingAverages": 1/float(outputCells),
+    "useSupport": True,
+    "useProximalProbabilities": True
   }
 
   L4Overrides = {
-    "learningRate": 0.001,
-    "noise": 1e-8,
-    "cellsPerColumn": 4, # new: 4 # original 32
+    "learningRate": 0.01,
+    "noise": 1e-10,
+    "cellsPerColumn": cellsPerColumn, # new: 4 # original 32
     "columnCount": 2048, # new: 2048 # original: 2048
-    "minThreshold": 0.35,
+    "initMovingAverages": 1/float(2048 * cellsPerColumn),
+    "minThreshold": 1/float(cellsPerColumn),
+    "useApicalTiebreak": True
   }
 
   exp1 = L4L2Experiment(
@@ -310,7 +316,7 @@ def runExperiment():
     L4Overrides=L4Overrides,
     numCorticalColumns=1,
     maxSegmentsPerCell=maxNumSegments,
-    numLearningPoints=4,
+    numLearningPoints=numOfRuns,
     seed=1
   )
 
@@ -360,7 +366,7 @@ def runExperiment():
   singleColumnHighlight = next(
     (idx for idx, value in enumerate(l2ActiveCellsSingleColumn)
      if len(value[0]) == sdrSize), None)
-  firstObjectRepresentation = exp1.objectL2Representations[0][0]
+  firstObjectRepresentation = exp1.objectL2Representations[objectId][0]
   converged = next(
     (idx for idx, value in enumerate(l2ActiveCellsSingleColumn)
      if (value[0] == firstObjectRepresentation)), None)
@@ -423,4 +429,8 @@ def runExperiment():
 
 
 if __name__ == "__main__":
-  runExperiment()
+  # runs = [1, 5, 10, 50, 100]
+  runs = [10]
+  for run in runs:
+    print "Number of runs", run
+    runExperiment(run)
