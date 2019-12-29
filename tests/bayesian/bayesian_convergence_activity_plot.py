@@ -280,10 +280,10 @@ def runExperiment(numOfRuns):
       featureLocations.append({0: objects[i][j][0]})
     objectsSingleColumn[i] = featureLocations
 
-  cellsPerColumn = 4
+  cellsPerColumn = 16
   outputCells = 128
   # params
-  maxNumSegments = 10
+  maxNumSegments = 16
   L2Overrides = {
     "learningRate": 0.01,
     "noise": 1e-10,
@@ -291,7 +291,7 @@ def runExperiment(numOfRuns):
     "inputWidth": 2048 * cellsPerColumn, # new: 8192 # original: 16384 (?)
     "activationThreshold": 0.4,
     "sdrSize": 5,
-    "forgetting": 0.1,
+    "forgetting": 0.2,
     "initMovingAverages": 1/float(outputCells),
     "useSupport": True,
     "useProximalProbabilities": True
@@ -309,7 +309,7 @@ def runExperiment(numOfRuns):
 
   exp1 = L4L2Experiment(
     'single_column',
-    implementation='Bayesian',
+    implementation='SummingBayesian',
     L2RegionType="py.BayesianColumnPoolerRegion",
     L4RegionType="py.BayesianApicalTMPairRegion",
     L2Overrides=L2Overrides,
@@ -324,7 +324,7 @@ def runExperiment(numOfRuns):
   exp1.learnObjects(objectsSingleColumn)
 
   # test on the first object
-  objectId = 0
+  objectId = 2
   obj = objectMachine[objectId]
 
   # Create sequence of sensations for this object for all columns
@@ -430,7 +430,7 @@ def runExperiment(numOfRuns):
 
 if __name__ == "__main__":
   # runs = [1, 5, 10, 50, 100]
-  runs = [10]
+  runs = [5]
   for run in runs:
     print "Number of runs", run
     runExperiment(run)
