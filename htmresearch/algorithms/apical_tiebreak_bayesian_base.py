@@ -128,8 +128,8 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
         self.apicalBias = np.zeros((self.numApicalSegments, self.columnCount*self.cellsPerColumn))
 
         # Set to zero to use randomly initialized first weight value
-        self.basalSegmentCount = np.zeros((self.columnCount, self.cellsPerColumn))
-        self.apicalSegmentCount = np.zeros((self.columnCount, self.cellsPerColumn))
+        self.basalSegmentCount = np.ones((self.columnCount, self.cellsPerColumn))
+        self.apicalSegmentCount = np.ones((self.columnCount, self.cellsPerColumn))
 
         # Changed to float64 to model continuous values
         self.predictedCells = np.zeros(self.numberOfCells(), dtype="float64")
@@ -274,9 +274,11 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
 
         # Calculate basal segment activity after bursting
         if bursting_columns.shape[0] > 0:
-            if np.any(self.numBasalSegments == np.min(self.basalSegmentCount[activeColumns, :], axis=1)):
+            if np.any(self.numBasalSegments == np.min(self.basalSegmentCount[activeColumns, :], axis=1)) and \
+                    self.maxSegmentsPerCell >= np.max(self.basalSegmentCount):
                 self._addNewSegments(isBasal=True)
-            if np.any(self.numApicalSegments == np.min(self.apicalSegmentCount[activeColumns, :], axis=1)):
+            if np.any(self.numApicalSegments == np.min(self.apicalSegmentCount[activeColumns, :], axis=1)) and \
+                    self.maxSegmentsPerCell >= np.max(self.apicalSegmentCount):
                 self._addNewSegments(isBasal=False)
 
             self.activeBasalSegments, self.basalSegmentCount = self._setMaxSegmentsAfterBursting(
@@ -345,11 +347,13 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
             min_segment_cells_ind,
             burstingColumns
         ] = 1
-        update_ind = segmentCount[
+        segment_mask = segmentCount[
             burstingColumns,
             min_segment_cells_ind
-        ][segmentCount[burstingColumns, min_segment_cells_ind] < self.maxSegmentsPerCell].astype('int32')
-        segmentCount[burstingColumns, min_segment_cells_ind][update_ind] += 1
+        ] < self.maxSegmentsPerCell
+        segmentCountUpdate = np.zeros(segment_mask.shape)
+        segmentCountUpdate[segment_mask] = 1
+        segmentCount[burstingColumns, min_segment_cells_ind] += segmentCountUpdate
         return self._reshapeSegmetsFromColumnBased(segments_column_based, isApical=isApical), segmentCount
 
     def _calculatePredictedCells(self, activeBasalSegments, activeApicalSegments):
@@ -411,7 +415,8 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
         # It's changed in the weight update rules that none of the weight values is set to -inf.
         # Thus we can easily use simple matrix multiplication
         # We normalise the input to avoid activation explosion
-        transformedActivation = activeInput / float(activeInput.shape[0])
+        normalization = float(activeInput.sum())
+        transformedActivation = activeInput / normalization if normalization > 0 else np.zeros(activeInput.shape)
         return np.exp(weights.dot(transformedActivation)) if not use_bias else np.exp(weights.dot(transformedActivation) + bias)
 
     ###################################################################################################################
