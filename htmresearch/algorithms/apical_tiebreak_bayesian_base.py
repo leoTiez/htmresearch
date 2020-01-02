@@ -128,8 +128,8 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
         self.apicalBias = np.zeros((self.numApicalSegments, self.columnCount*self.cellsPerColumn))
 
         # Set to zero to use randomly initialized first weight value
-        self.basalSegmentCount = np.zeros((self.columnCount, self.cellsPerColumn))
-        self.apicalSegmentCount = np.zeros((self.columnCount, self.cellsPerColumn))
+        self.basalSegmentCount = np.ones((self.columnCount, self.cellsPerColumn))
+        self.apicalSegmentCount = np.ones((self.columnCount, self.cellsPerColumn))
 
         # Changed to float64 to model continuous values
         self.predictedCells = np.zeros(self.numberOfCells(), dtype="float64")
@@ -207,6 +207,7 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
         @param apicalInput (numpy array)
         List of active input bits for the apical dendrite segments
         """
+
         activation_basal = self._calculateSegmentActivity(
             self.basalWeights,
             basalInput,
@@ -219,11 +220,9 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
             apicalInput,
             self.apicalBias,
             self.noise,
-            use_bias=False
+            use_bias=True
         )
 
-        activation_basal = np.exp(activation_basal)
-        activation_apical = np.exp(activation_apical)
         self.predictedCells = self._calculatePredictedValues(activation_basal, activation_apical)
         self.activeBasalSegments = activation_basal
         self.activeApicalSegments = activation_apical
@@ -275,9 +274,11 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
 
         # Calculate basal segment activity after bursting
         if bursting_columns.shape[0] > 0:
-            if np.any(self.numBasalSegments == np.min(self.basalSegmentCount[activeColumns, :], axis=1)):
+            if np.any(self.numBasalSegments == np.min(self.basalSegmentCount[activeColumns, :], axis=1)) and \
+                    self.maxSegmentsPerCell >= np.max(self.basalSegmentCount):
                 self._addNewSegments(isBasal=True)
-            if np.any(self.numApicalSegments == np.min(self.apicalSegmentCount[activeColumns, :], axis=1)):
+            if np.any(self.numApicalSegments == np.min(self.apicalSegmentCount[activeColumns, :], axis=1)) and \
+                    self.maxSegmentsPerCell >= np.max(self.apicalSegmentCount):
                 self._addNewSegments(isBasal=False)
 
             self.activeBasalSegments, self.basalSegmentCount = self._setMaxSegmentsAfterBursting(
@@ -346,11 +347,13 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
             min_segment_cells_ind,
             burstingColumns
         ] = 1
-        update_ind = segmentCount[
+        segment_mask = segmentCount[
             burstingColumns,
             min_segment_cells_ind
-        ][segmentCount[burstingColumns, min_segment_cells_ind] < self.maxSegmentsPerCell].astype('int32')
-        segmentCount[burstingColumns, min_segment_cells_ind][update_ind] += 1
+        ] < self.maxSegmentsPerCell
+        segmentCountUpdate = np.zeros(segment_mask.shape)
+        segmentCountUpdate[segment_mask] = 1
+        segmentCount[burstingColumns, min_segment_cells_ind] += segmentCountUpdate
         return self._reshapeSegmetsFromColumnBased(segments_column_based, isApical=isApical), segmentCount
 
     def _calculatePredictedCells(self, activeBasalSegments, activeApicalSegments):
@@ -381,7 +384,6 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
     def _learn(self, isBasal=True):
         weights = self._updateWeights(isBasal=isBasal)
         # set division by zero to zero since this represents unused segments
-        weights[np.isnan(weights)] = 0
         weights = np.log(weights)
 
         # Unused segments are set to -inf. That is desired since we take the exp function for the activation
@@ -410,15 +412,12 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
 
     @staticmethod
     def _calculateSegmentActivity(weights, activeInput, bias, noise, use_bias=True):
-        # Runtime warnings for negative infinity can be ignored here
-        activeMask = activeInput > 0
-        # Only sum over active input -> otherwise large negative sum due to sparse activity and 0 inputs with noise
-        # activation = np.log(np.multiply(weights[:, :, activeMask], activeInput[activeMask]) + noise)
-        activation = np.multiply(weights[:, :, activeMask], activeInput[activeMask]) + noise
-        # Special case if active mask has no active inputs (e.g initialisation)
-        # then activation becomes 0 and hence the exp of it 1
-        activation = activation.sum(axis=2) if np.any(activeMask) else activation.sum(axis=2) + np.NINF
-        return activation if not use_bias else activation + bias
+        # It's changed in the weight update rules that none of the weight values is set to -inf.
+        # Thus we can easily use simple matrix multiplication
+        # We normalise the input to avoid activation explosion
+        normalization = float(activeInput.sum())
+        transformedActivation = activeInput / normalization if normalization > 0 else np.zeros(activeInput.shape)
+        return np.exp(weights.dot(transformedActivation)) if not use_bias else np.exp(weights.dot(transformedActivation) + bias)
 
     ###################################################################################################################
     # Reshape methods

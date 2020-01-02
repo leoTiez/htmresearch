@@ -117,12 +117,12 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
             seed=seed
         )
 
-        self.basalConnectionCount = np.zeros((1, self.numberOfCells(), self.basalInputSize))
-        self.apicalConnectionCount = np.zeros((1, self.numberOfCells(), self.apicalInputSize))
-        self.basalSegmentActivationCount = np.zeros(self.numberOfCells())
-        self.apicalSegmentActivationCount = np.zeros(self.numberOfCells())
-        self.basalInputCount = np.zeros(self.basalInputSize)
-        self.apicalInputCount = np.zeros(self.apicalInputSize)
+        self.basalConnectionCount = np.zeros((1, self.numberOfCells(), self.basalInputSize), dtype='int64')
+        self.apicalConnectionCount = np.zeros((1, self.numberOfCells(), self.apicalInputSize), dtype='int64')
+        self.basalSegmentActivationCount = np.zeros(self.numberOfCells(), dtype='int64')
+        self.apicalSegmentActivationCount = np.zeros(self.numberOfCells(), dtype='int64')
+        self.basalInputCount = np.zeros(self.basalInputSize, dtype='int64')
+        self.apicalInputCount = np.zeros(self.apicalInputSize, dtype='int64')
         self.updateCounter = 0
 
     def _addNewSegments(self, isBasal=True):
@@ -144,25 +144,107 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
             activeSegments = np.append(activeSegments, np.zeros((1, numberOfCells)), axis=0)
             numSegments += 1
 
+        if isBasal:
+            self._setBasalConnectionData(
+                weight_matrix=weights,
+                connection_count_matrix=connectionCount,
+                bias_matrix=bias,
+                activity_count_matrix=segmentActivationCount,
+                active_segments=activeSegments,
+                numSegments=numSegments
+            )
+        else:
+            self._setApicalConnectionData(
+                weight_matrix=weights,
+                connection_count_matrix=connectionCount,
+                bias_matrix=bias,
+                activity_count_matrix=segmentActivationCount,
+                active_segments=activeSegments,
+                numSegments=numSegments
+            )
+    def _setBasalConnectionData(
+            self,
+            weight_matrix=None,
+            connection_count_matrix=None,
+            bias_matrix=None,
+            activity_count_matrix=None,
+            active_segments=None,
+            numSegments=None,
+            input_count_matrix=None
+    ):
+        if weight_matrix is not None:
+            self.basalWeights = weight_matrix
+        if connection_count_matrix is not None:
+            self.basalConnectionCount = connection_count_matrix
+        if bias_matrix is not None:
+            self.basalBias = bias_matrix
+        if activity_count_matrix is not None:
+            self.basalSegmentActivationCount = activity_count_matrix
+        if active_segments is not None:
+            self.activeBasalSegments = active_segments
+        if numSegments is not None:
+            self.numBasalSegments = numSegments
+        if input_count_matrix is not None:
+            self.basalInputCount = input_count_matrix
+
+    def _setApicalConnectionData(
+            self,
+            weight_matrix=None,
+            connection_count_matrix=None,
+            bias_matrix=None,
+            activity_count_matrix=None,
+            active_segments=None,
+            numSegments=None,
+            input_count_matrix=None
+    ):
+        if weight_matrix is not None:
+            self.apicalWeights = weight_matrix
+        if connection_count_matrix is not None:
+            self.apicalConnectionCount = connection_count_matrix
+        if bias_matrix is not None:
+            self.apicalBias = bias_matrix
+        if activity_count_matrix is not None:
+            self.apicalSegmentActivationCount = activity_count_matrix
+        if active_segments is not None:
+            self.activeApicalSegments = active_segments
+        if numSegments is not None:
+            self.numApicalSegments = numSegments
+        if input_count_matrix is not None:
+            self.apicalInputCount = input_count_matrix
+
+
     def _updateConnectionData(self, isBasal=True):
-      numSegments = self.numBasalSegments if isBasal else self.numApicalSegments
-      segments = self.activeBasalSegments if isBasal else self.activeApicalSegments
-      inputValues = self.basalInput if isBasal else self.apicalInput
-      connectionCount = self.basalConnectionCount if isBasal else self.apicalConnectionCount
-      segmentActivityCount = self.basalSegmentActivationCount if isBasal else self.apicalSegmentActivationCount
-      inputCount = self.basalInputCount if isBasal else self.apicalInputCount
+        numSegments = self.numBasalSegments if isBasal else self.numApicalSegments
+        segments = self.activeBasalSegments if isBasal else self.activeApicalSegments
+        inputValues = self.basalInput if isBasal else self.apicalInput
+        connectionCount = self.basalConnectionCount if isBasal else self.apicalConnectionCount
+        segmentActivityCount = self.basalSegmentActivationCount if isBasal else self.apicalSegmentActivationCount
+        inputCount = self.basalInputCount if isBasal else self.apicalInputCount
 
-      # Updating moving average weights to input
-      connection_matrix = np.outer(segments, inputValues)
-      # Consider only active segments
-      connection_matrix = connection_matrix.reshape(numSegments, self.numberOfCells(), connectionCount.shape[-1])
-      connectionCount += connection_matrix
+        # Updating moving average weights to input
+        connection_matrix = np.outer(segments, inputValues)
+        # Consider only active segments
+        connection_matrix = connection_matrix.reshape(numSegments, self.numberOfCells(), connectionCount.shape[-1])
+        connectionCount += connection_matrix.astype('int64')
 
-      # Updating moving average bias of each segment
-      segmentActivityCount += segments.reshape(-1)
+        # Updating moving average bias of each segment
+        segmentActivityCount += segments.reshape(-1).astype('int64')
 
-      # Updating moving average input activity
-      inputCount += inputValues.reshape(-1)
+        # Updating moving average input activity
+        inputCount += inputValues.reshape(-1).astype('int64')
+
+        if isBasal:
+            self._setBasalConnectionData(
+                connection_count_matrix=connectionCount,
+                activity_count_matrix=segmentActivityCount,
+                input_count_matrix=inputCount
+            )
+        else:
+            self._setApicalConnectionData(
+                connection_count_matrix=connectionCount,
+                activity_count_matrix=segmentActivityCount,
+                input_count_matrix=inputCount
+            )
 
     def _afterUpdate(self):
         self.updateCounter += 1
@@ -172,11 +254,12 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
         activationCount = self.basalSegmentActivationCount if isBasal else self.apicalSegmentActivationCount
         inputCount = self.basalInputCount if isBasal else self.apicalInputCount
 
-        weights = (connectionCount * self.updateCounter) / np.outer(
+        weights = (connectionCount.astype('float64') * self.updateCounter) / np.outer(
             activationCount,
             inputCount
-        ).reshape(connectionCount.shape)
-
+        ).reshape(connectionCount.shape).astype('float64')
+        weights[weights == 0] = 1. / float(self.updateCounter)
+        weights[np.isnan(weights)] = 1.
         return weights
 
     def _updateBias(self, isBasal=True):

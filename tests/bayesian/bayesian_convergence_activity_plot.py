@@ -289,6 +289,8 @@ def runExperiment():
     "inputWidth": 8192, # new: 8192 # original: 16384 (?)
     "activationThreshold": 0.01,
     "sdrSize": 40,
+    "forgetting": 0.1,
+    "useSupport": True
   }
 
   L4Overrides = {
@@ -301,14 +303,14 @@ def runExperiment():
 
   exp1 = L4L2Experiment(
     'single_column',
-    implementation='SummingBayesian',
+    implementation='Bayesian',
     L2RegionType="py.BayesianColumnPoolerRegion",
     L4RegionType="py.BayesianApicalTMPairRegion",
     L2Overrides=L2Overrides,
     L4Overrides=L4Overrides,
     numCorticalColumns=1,
     maxSegmentsPerCell=maxNumSegments,
-    numLearningPoints=3,
+    numLearningPoints=4,
     seed=1
   )
 
