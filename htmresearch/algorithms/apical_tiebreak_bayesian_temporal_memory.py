@@ -117,36 +117,135 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemoryBase)
             seed=seed
         )
 
+        self.initMovingAverages = initMovingAverages
+        if self.initMovingAverages == 0:
+            self.initMovingAverages = self.noise**2
+
         self.basalMovingAverages = np.full(
             (self.numBasalSegments, self.numberOfCells(), self.basalInputSize),
-            initMovingAverages
+            self.initMovingAverages
         )
         self.apicalMovingAverages = np.full(
             (self.numApicalSegments, self.numberOfCells(), self.apicalInputSize),
-            initMovingAverages
+            self.initMovingAverages
         )
-        self.basalMovingAveragesBias = np.full((self.numBasalSegments, self.numberOfCells()), initMovingAverages)
-        self.apicalMovingAveragesBias = np.full((self.numApicalSegments, self.numberOfCells()), initMovingAverages)
-        self.basalMovingAverageInput = np.full(self.basalInputSize, initMovingAverages)
-        self.apicalMovingAverageInput = np.full(self.apicalInputSize, initMovingAverages)
 
+        self.basalMovingAveragesBias = np.full((self.numBasalSegments, self.numberOfCells()), self.initMovingAverages)
+        self.apicalMovingAveragesBias = np.full((self.numApicalSegments, self.numberOfCells()), self.initMovingAverages)
+        self.basalMovingAverageInput = np.full(self.basalInputSize, self.initMovingAverages)
+        self.apicalMovingAverageInput = np.full(self.apicalInputSize, self.initMovingAverages)
 
     def _addNewSegments(self, isBasal=True):
         input_size = self.basalInputSize if isBasal else self.apicalInputSize
-        weight_matrix = self.basalWeights if isBasal else self.apicalWeights
-        average_matrix = self.basalMovingAverages if isBasal else self.apicalMovingAverages
-        bias_matrix = self.basalBias if isBasal else self.apicalBias
-        bias_average = self.basalMovingAveragesBias if isBasal else self.apicalMovingAveragesBias
-        active_segments = self.activeBasalSegments if isBasal else self.activeApicalSegments
-        numSegments = self.numBasalSegments if isBasal else self.numApicalSegments
+        if isBasal:
+            (weight_matrix,
+             average_matrix,
+             bias_matrix,
+             bias_average,
+             active_segments,
+             numSegments) = self._getBasalConnectionData()
+        else:
+            (weight_matrix,
+             average_matrix,
+             bias_matrix,
+             bias_average,
+             active_segments,
+             numSegments) = self._getApicalConnectionData()
 
-        if numSegments + 1 < self.maxSegmentsPerCell:
-            weight_matrix = np.append(weight_matrix, np.zeros((1, self.numberOfCells(), input_size)), axis=0)
-            average_matrix = np.append(average_matrix, np.zeros((1, self.numberOfCells(), input_size)), axis=0)
-            bias_matrix = np.append(bias_matrix, np.zeros((1, self.numberOfCells())), axis=0)
-            bias_average = np.append(bias_average, np.zeros((1, self.numberOfCells())), axis=0)
-            active_segments = np.append(active_segments, np.zeros((1, self.numberOfCells())), axis=0)
+        if numSegments <= self.maxSegmentsPerCell:
+            weight_matrix = np.append(weight_matrix, np.full((1, self.numberOfCells(), input_size), 0), axis=0)
+            average_matrix = np.append(average_matrix, np.full((1, self.numberOfCells(), input_size),
+                                                               self.initMovingAverages), axis=0)
+            bias_matrix = np.append(bias_matrix, np.full((1, self.numberOfCells()), 0), axis=0)
+            bias_average = np.append(bias_average, np.full((1, self.numberOfCells()),
+                                                           self.initMovingAverages), axis=0)
+            active_segments = np.append(active_segments, np.full((1, self.numberOfCells()), 0), axis=0)
             numSegments += 1
+
+        if isBasal:
+            self._setBasalConnectionData(
+                weight_matrix=weight_matrix,
+                average_matrix=average_matrix,
+                bias_matrix=bias_matrix,
+                bias_average=bias_average,
+                active_segments=active_segments,
+                numSegments=numSegments
+            )
+        else:
+            self._setApicalConnectionData(
+                weight_matrix=weight_matrix,
+                average_matrix=average_matrix,
+                bias_matrix=bias_matrix,
+                bias_average=bias_average,
+                active_segments=active_segments,
+                numSegments=numSegments
+            )
+
+    def _getBasalConnectionData(self):
+        return (self.basalWeights,
+                self.basalMovingAverages,
+                self.basalBias,
+                self.basalMovingAveragesBias,
+                self.activeBasalSegments,
+                self.numBasalSegments)
+
+    def _getApicalConnectionData(self):
+        return (self.apicalWeights,
+                self.apicalMovingAverages,
+                self.apicalBias,
+                self.apicalMovingAveragesBias,
+                self.activeApicalSegments,
+                self.numApicalSegments)
+
+    def _setBasalConnectionData(
+            self,
+            weight_matrix=None,
+            average_matrix=None,
+            bias_matrix=None,
+            bias_average=None,
+            active_segments=None,
+            numSegments=None,
+            input_average=None
+    ):
+        if weight_matrix is not None:
+            self.basalWeights = weight_matrix
+        if average_matrix is not None:
+            self.basalMovingAverages = average_matrix
+        if bias_matrix is not None:
+            self.basalBias = bias_matrix
+        if bias_average is not None:
+            self.basalMovingAveragesBias = bias_average
+        if active_segments is not None:
+            self.activeBasalSegments = active_segments
+        if numSegments is not None:
+            self.numBasalSegments = numSegments
+        if input_average is not None:
+            self.basalMovingAverageInput = input_average
+
+    def _setApicalConnectionData(
+            self,
+            weight_matrix=None,
+            average_matrix=None,
+            bias_matrix=None,
+            bias_average=None,
+            active_segments=None,
+            numSegments=None,
+            input_average=None,
+    ):
+        if weight_matrix is not None:
+            self.apicalWeights = weight_matrix
+        if average_matrix is not None:
+            self.apicalMovingAverages = average_matrix
+        if bias_matrix is not None:
+            self.apicalBias = bias_matrix
+        if bias_average is not None:
+            self.apicalMovingAveragesBias = bias_average
+        if active_segments is not None:
+            self.activeApicalSegments = active_segments
+        if numSegments is not None:
+            self.numApicalSegments = numSegments
+        if input_average is not None:
+            self.apicalMovingAverageInput = input_average
 
     def _updateConnectionData(self, isBasal=True):
         numSegments = self.numBasalSegments if isBasal else self.numApicalSegments
@@ -168,11 +267,11 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemoryBase)
         # First update input values (includes learning rate)
         # Then use the probabilities of activity for movingAverage calculation
         # Instead of using 1 -> would lead to weight explosion, because we calculate weights based on MovingAverageInput
-        inputProbabilities = inputValues
-        inputProbabilities[inputValues.nonzero()] = movingAverageInput[inputValues.nonzero()]
+        # inputProbabilities = inputValues
+        # inputProbabilities[inputValues.nonzero()] = movingAverageInput[inputValues.nonzero()]
 
         # Updating moving average weights to input
-        noisy_connection_matrix = np.outer((1 - self.noise ** 2) * segments, inputProbabilities)
+        noisy_connection_matrix = np.outer((1 - self.noise ** 2) * segments, inputValues)
         # Consider only active segments
         noisy_connection_matrix[noisy_connection_matrix > 0] += self.noise ** 2
         noisy_connection_matrix = noisy_connection_matrix.reshape(numSegments, self.numberOfCells(), inputSize)
@@ -187,6 +286,19 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemoryBase)
         movingAverageBias += self.learningRate * (
                 noisy_activation_vector - movingAverageBias
         )
+
+        if isBasal:
+            self._setBasalConnectionData(
+                average_matrix=movingAverage,
+                bias_average=movingAverageBias,
+                input_average=movingAverageInput
+            )
+        else:
+            self._setApicalConnectionData(
+                average_matrix=movingAverage,
+                bias_average=movingAverageBias,
+                input_average=movingAverageInput
+            )
 
     def _afterUpdate(self):
         pass

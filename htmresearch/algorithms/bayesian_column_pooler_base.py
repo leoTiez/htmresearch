@@ -200,7 +200,6 @@ class BayesianColumnPoolerBase(object):
         self.activeCells = np.zeros(self.cellCount, dtype="float64")
         self.activePredictionCells = np.zeros(self.cellCount, dtype="float64")
 
-
     def compute(
             self,
             feedforwardInput=(),
@@ -332,7 +331,7 @@ class BayesianColumnPoolerBase(object):
 
         if VERBOSITY > 1:
             act = self._activation(self.proximalWeights, feedforwardInput, self.proximalBias, self.noise)
-            print "Activation with current weights in learning", act[act > 0]
+            print "Activation with current weights in learning" #, act[act > 0]
 
         # External distal learning
         for i, _ in enumerate(lateralInputs):
@@ -376,13 +375,12 @@ class BayesianColumnPoolerBase(object):
             feedForwardActivation > 0.0
             ] = feedForwardActivation[feedForwardActivation > 0.0] if self.useProximalProbabilities else 1
 
-
         # Compute activePredition cells based on activity and support
         activity = self.activeCells.copy()
 
         if self.useSupport:
             # first touch has no previous activation => exclude
-            if (np.any(self.prevActiveCells)):
+            if np.any(self.prevActiveCells):
                 activity *= self._activation(self.internalDistalWeights, self.prevActiveCells, self.internalDistalBias,
                                              self.noise)
 
@@ -398,7 +396,6 @@ class BayesianColumnPoolerBase(object):
     def _learn(self, connectionIndicator, **kwargs):
         weights = self._updateWeights(connectionIndicator=connectionIndicator, **kwargs)
         # set division by zero to zero since this represents unused segments
-        weights[np.isnan(weights)] = 0
         weights = np.log(weights)
 
         bias = self._updateBias(connectionIndicator=connectionIndicator, **kwargs)
@@ -411,24 +408,10 @@ class BayesianColumnPoolerBase(object):
 
     @staticmethod
     def _activation(weights, input, bias, noise, useBias=True, ignoreNinf=False):
-        # Runtime warnings for negative infinity can be ignored here
-        activeMask = input > 0
-        # Only sum over active input -> otherwise large negative sum due to sparse activity and 0 inputs with noise
-        # activation = np.log(np.multiply(weights[:, activeMask], input[activeMask]) + noise)
-        activation = np.multiply(weights[:, activeMask], input[activeMask]) + noise
-        # Special case if active mask has no active inputs (e.g initialisation)
-        # then activation becomes 0 and hence the exp of it 1
-        # if not ignoreNinf:
-        #     activation = activation.sum(axis=1) if np.any(activeMask) else activation.sum(axis=1) + np.NINF
-        # else:
-        #     activation = np.ma.masked_invalid(activation).sum(axis=1) if np.any(activeMask) else activation.sum(axis=1) + np.NINF
-
-        # Set explicitly to zero to avoid summing NINF if only one connection is non-existend for a neuron (because multiple objects are activated and only overlapping would be inferred)
-        activation[activation == np.NINF] = 0
-        activation = activation.sum(axis=1) if np.any(activeMask) else activation.sum(axis=1) + np.NINF
-        activation[activation == 0] = np.NINF
-
-        activation = activation if not useBias else activation + bias
+        # To avoid explosion of activation value the input is normalised
+        # It's made sure that all weight values are set. Hence we can make use of simple matrix multiplication
+        transformed_input = input / float(input.sum())
+        activation = weights.dot(transformed_input) if not useBias else weights.dot(transformed_input) + bias
         return np.exp(activation)
 
     @staticmethod

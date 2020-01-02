@@ -230,6 +230,12 @@ class BayesianApicalTMPairRegion(PyRegion):
           "dataType": "Real32",
           "count": 1
         },
+        "initMovingAverages": {
+          "description": "Init value for the moving averages",
+          "accessMode": "Read",
+          "dataType": "Real32",
+          "count": 1
+        },
         "useApicalTiebreak": {
           "description": "Flag for using apical information",
           "accessMode": "Read",
@@ -272,6 +278,7 @@ class BayesianApicalTMPairRegion(PyRegion):
                seed=42,
                noise=0.01,  # lambda
                learningRate=0.1,  # alpha
+               initMovingAverages=0.0,  # alpha
                useApicalTiebreak=False,
                # Region params
                implementation="BayesianApicalTiebreak",
@@ -292,6 +299,7 @@ class BayesianApicalTMPairRegion(PyRegion):
     self.seed = seed
     self.noise = noise
     self.learningRate = learningRate
+    self.initMovingAverages = initMovingAverages
     self.useApicalTiebreak = useApicalTiebreak
 
     # Region params
@@ -327,6 +335,7 @@ class BayesianApicalTMPairRegion(PyRegion):
       if self.implementation == "Bayesian":
         import htmresearch.algorithms.apical_tiebreak_bayesian_temporal_memory as btm
         cls = btm.BayesianApicalTiebreakPairMemory
+        params["initMovingAverages"] = self.initMovingAverages
       elif self.implementation == "SummingBayesian":
         import htmresearch.algorithms.apical_tiebreak_bayesian_summing_temporal_memory as btm
         cls = btm.SummingBayesianApicalTiebreakPairMemory

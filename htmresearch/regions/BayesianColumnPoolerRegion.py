@@ -323,6 +323,14 @@ class BayesianColumnPoolerRegion(PyRegion):
           defaultValue=0.1,
           count=1
         ),
+
+        initMovingAverages=dict(
+          description="Init values for moving averages",
+          accessMode="Read",
+          dataType="Real32",
+          defaultValue=0.0,
+          count=1
+        ),
         useSupport=dict(
           description="Flag whether or not to use support",
           accessMode="Read",
@@ -402,6 +410,7 @@ class BayesianColumnPoolerRegion(PyRegion):
                learningRate=0.1,  # alpha
                activationThreshold=0.5,  # probability such that a cell becomes active
                forgetting=0.1,
+               initMovingAverages=0.0,
                useSupport=False,
                avoidWeightExplosion=True,
                resetProximalCounter=False,
@@ -432,6 +441,7 @@ class BayesianColumnPoolerRegion(PyRegion):
     self.implementation = implementation
 
     self.forgetting = forgetting
+    self.initMovingAverages = initMovingAverages
     self.useSupport = useSupport
     self.avoidWeightExplosion = avoidWeightExplosion
     self.resetProximalCounter = resetProximalCounter
@@ -468,6 +478,7 @@ class BayesianColumnPoolerRegion(PyRegion):
       if self.implementation == "Bayesian":
         from htmresearch.algorithms.bayesian_column_pooler import BayesianColumnPooler as cls
         params["learningRate"] = self.learningRate
+        params["initMovingAverages"] = self.initMovingAverages
 
       elif self.implementation == "SummingBayesian":
         from htmresearch.algorithms.bayesian_summing_column_pooler import BayesianSummingColumnPooler as cls
