@@ -35,6 +35,25 @@ from htmresearch.frameworks.layers.object_machine_factory import (
   createObjectMachine
 )
 
+import argparse
+
+def parse_cmd():
+    parser = argparse.ArgumentParser(description='L4L2 Experiment')
+    parser.add_argument('--implementation', type=str)
+    parser.add_argument('--learningRate', type=float)
+    parser.add_argument('--forgetting', type=float)
+    parser.add_argument('--outputCount', type=int)
+    parser.add_argument('--cellCount', type=int)
+    parser.add_argument('--sdrSize', type=int)
+    parser.add_argument('--outputActivation', type=float)
+    parser.add_argument('--useSupport', type=bool)
+    parser.add_argument('--useApicalTiebreak', type=bool)
+
+    parsed_args = parser.parse_args()
+
+    return parsed_args
+
+
 # Plotly requires a valid user to be able to save High Res images
 plotlyUser = os.environ.get('PLOTLY_USERNAME')
 plotlyAPIKey = os.environ.get('PLOTLY_API_KEY')
@@ -246,7 +265,7 @@ def plotL2ObjectRepresentations(exp1):
 
 
 
-def runExperiment(numOfRuns):
+def runExperiment(arguments):
   """
   We will run two experiments side by side, with either single column
   or 3 columns
@@ -255,7 +274,7 @@ def runExperiment(numOfRuns):
   numFeatures = 3 # new: 3 # original: 3
   numPoints = 5 # new: 5 # original: 10
   numLocations = 5 # new: 5 # original: 10
-  numObjects = 3 # new: 2 # original: 10
+  numObjects = 5 # new: 2 # original: 10
   numRptsPerSensation = 1
 
   objectMachine = createObjectMachine(
@@ -280,45 +299,57 @@ def runExperiment(numOfRuns):
       featureLocations.append({0: objects[i][j][0]})
     objectsSingleColumn[i] = featureLocations
 
-  cellsPerColumn = 16
-  outputCells = 128
+  cellsPerColumn = arguments.cellCount
+  outputCells = arguments.outputCount
   # params
   maxNumSegments = 16
   L2Overrides = {
-    "learningRate": 0.01,
     "noise": 1e-10,
     "cellCount": outputCells, # new: 256 # original: 4096
     "inputWidth": 2048 * cellsPerColumn, # new: 8192 # original: 16384 (?)
-    "activationThreshold": 0.4,
-    "sdrSize": 5,
-    "forgetting": 0.2,
+    "activationThreshold": arguments.outputActivation,
+    "sdrSize": arguments.sdrSize,
+    "forgetting": arguments.forgetting,
     "initMovingAverages": 1/float(outputCells),
-    "useSupport": True,
-    "useProximalProbabilities": True
+    "useSupport": arguments.useSupport,
+    "useProximalProbabilities": True,
+    "avoidWeightExplosion": False
   }
 
   L4Overrides = {
-    "learningRate": 0.01,
     "noise": 1e-10,
     "cellsPerColumn": cellsPerColumn, # new: 4 # original 32
     "columnCount": 2048, # new: 2048 # original: 2048
     "initMovingAverages": 1/float(2048 * cellsPerColumn),
     "minThreshold": 1/float(cellsPerColumn),
-    "useApicalTiebreak": True
+    "useApicalTiebreak": arguments.useApicalTiebreak
   }
 
-  exp1 = L4L2Experiment(
-    'single_column',
-    implementation='SummingBayesian',
-    L2RegionType="py.BayesianColumnPoolerRegion",
-    L4RegionType="py.BayesianApicalTMPairRegion",
-    L2Overrides=L2Overrides,
-    L4Overrides=L4Overrides,
-    numCorticalColumns=1,
-    maxSegmentsPerCell=maxNumSegments,
-    numLearningPoints=numOfRuns,
-    seed=1
-  )
+  if arguments.implementation is None or "Bayesian" in arguments.implementation:
+    if "Summing" not in arguments.implementation:
+      L2Overrides["learningRate"] = arguments.learningRate
+      L4Overrides["learningRate"] = arguments.learningRate
+
+    exp1 = L4L2Experiment(
+      'single_column',
+      implementation=arguments.implementation,
+      L2RegionType="py.BayesianColumnPoolerRegion",
+      L4RegionType="py.BayesianApicalTMPairRegion",
+      L2Overrides=L2Overrides,
+      L4Overrides=L4Overrides,
+      numCorticalColumns=1,
+      maxSegmentsPerCell=maxNumSegments,
+      numLearningPoints=7,
+      seed=1
+    )
+  else:
+    exp1 = L4L2Experiment(
+      'single_column',
+      numCorticalColumns=1,
+      maxSegmentsPerCell=maxNumSegments,
+      numLearningPoints=3,
+      seed=1
+    )
 
   print "train single column "
   exp1.learnObjects(objectsSingleColumn)
@@ -429,8 +460,6 @@ def runExperiment(numOfRuns):
 
 
 if __name__ == "__main__":
-  # runs = [1, 5, 10, 50, 100]
-  runs = [5]
-  for run in runs:
-    print "Number of runs", run
-    runExperiment(run)
+  parsed_args = parse_cmd()
+  runExperiment(parsed_args)
+
