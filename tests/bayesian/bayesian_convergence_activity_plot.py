@@ -461,5 +461,6 @@ def runExperiment(arguments):
 
 if __name__ == "__main__":
   parsed_args = parse_cmd()
+  print parsed_args
   runExperiment(parsed_args)
 
