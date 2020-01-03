@@ -119,8 +119,8 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
 
         self.basalConnectionCount = np.zeros((1, self.numberOfCells(), self.basalInputSize), dtype='int64')
         self.apicalConnectionCount = np.zeros((1, self.numberOfCells(), self.apicalInputSize), dtype='int64')
-        self.basalSegmentActivationCount = np.zeros(self.numberOfCells(), dtype='int64')
-        self.apicalSegmentActivationCount = np.zeros(self.numberOfCells(), dtype='int64')
+        self.basalSegmentActivationCount = np.zeros((1, self.numberOfCells()), dtype='int64')
+        self.apicalSegmentActivationCount = np.zeros((1, self.numberOfCells()), dtype='int64')
         self.basalInputCount = np.zeros(self.basalInputSize, dtype='int64')
         self.apicalInputCount = np.zeros(self.apicalInputSize, dtype='int64')
         self.updateCounter = 0
@@ -134,13 +134,13 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
         activeSegments = self.activeBasalSegments if isBasal else self.activeApicalSegments
 
         numberOfCells = weights.shape[1]
-        inputSize = weights.shape[0]
+        inputSize = self.basalInputSize if isBasal else self.apicalInputSize
 
-        if numSegments + 1 < self.maxSegmentsPerCell:
+        if numSegments <= self.maxSegmentsPerCell:
             weights = np.append(weights, np.zeros((1, numberOfCells, inputSize)), axis=0)
             connectionCount = np.append(connectionCount, np.zeros((1, numberOfCells, inputSize)), axis=0)
-            bias = np.append(bias, np.zeros((1, numberOfCells)), axis=0)
-            segmentActivationCount = np.append(segmentActivationCount, np.zeros((1, numberOfCells)), axis=0)
+            bias = np.append(np.reshape(bias, (numSegments, numberOfCells)), np.zeros((1, numberOfCells)), axis=0)
+            segmentActivationCount = np.append(np.reshape(segmentActivationCount, (numSegments,numberOfCells)), np.zeros((1, numberOfCells)), axis=0)
             activeSegments = np.append(activeSegments, np.zeros((1, numberOfCells)), axis=0)
             numSegments += 1
 
@@ -228,7 +228,7 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
         connectionCount += connection_matrix.astype('int64')
 
         # Updating moving average bias of each segment
-        segmentActivityCount += segments.reshape(-1).astype('int64')
+        segmentActivityCount += segments.astype('int64')
 
         # Updating moving average input activity
         inputCount += inputValues.reshape(-1).astype('int64')
@@ -265,6 +265,5 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
     def _updateBias(self, isBasal=True):
         activationCount = self.basalSegmentActivationCount if isBasal else self.apicalSegmentActivationCount
         bias = np.log(activationCount / float(self.updateCounter))
-
         return bias
 
