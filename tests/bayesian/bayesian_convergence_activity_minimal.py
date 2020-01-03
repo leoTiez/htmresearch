@@ -22,7 +22,7 @@ def runExperiment():
   numFeatures = 3
   numPoints = 10
   numLocations = 10
-  numObjects = 10 # 2
+  numObjects = 5 # 10 # 2
   numRptsPerSensation = 2
 
   objectMachine = createObjectMachine(
@@ -47,32 +47,44 @@ def runExperiment():
       featureLocations.append({0: objects[i][j][0]})
     objectsSingleColumn[i] = featureLocations
 
+  # params
   maxNumSegments = 2
-  # we will run two experiments side by side, with either single column
-  # or 3 columns
-  # exp3 = L4L2Experiment(
-  #   'three_column',
-  #   implementation='BayesianApicalTiebreak',
-  #   L4RegionType="py.BayesianApicalTMPairRegion",
-  #   numCorticalColumns=3,
-  #   maxSegmentsPerCell=5,
-  #   seed=1
-  # )
+  L2Overrides = {
+    "learningRate": 0.1,
+    "noise": 1e-8,
+    "cellCount": 256,  # 256,  # new: 256 # original: 4096
+    "inputWidth": 8192,  # new: 8192 # original: 16384 (?)
+    "sdrSize": 40,
+    "activationThreshold": 0.5,
+    "forgetting": 0.01,
+    "useSupport": True,
+    "useProximalProbabilities": True,
+    "avoidWeightExplosion": True,
+  }
+
+  L4Overrides = {
+    "learningRate": 0.1,
+    "noise": 1e-8,
+    "cellsPerColumn": 4,  # new: 4 # original 32
+    "columnCount": 2048,  # new: 2048 # original: 2048
+    "minThreshold": 0.35,
+  }
 
   exp1 = L4L2Experiment(
     'single_column',
-    implementation='SummingBayesian',
+    implementation= 'Bayesian', # 'Bayesian', # 'SummingBayesian',
     L2RegionType="py.BayesianColumnPoolerRegion",
     L4RegionType="py.BayesianApicalTMPairRegion",
+    L2Overrides=L2Overrides,
+    L4Overrides=L4Overrides,
     numCorticalColumns=1,
     maxSegmentsPerCell=maxNumSegments,
-    seed=1
+    numLearningPoints=3,  # number repetitions for learning
+    seed=1,
   )
 
   print "train single column "
   exp1.learnObjects(objectsSingleColumn)
-  # print "train multi-column "
-  # exp3.learnObjects(objects)
 
   # test on the first object
   objectId = 0
@@ -102,18 +114,6 @@ def runExperiment():
     sdrs = objectMachine._getSDRPairs(pairs)
     sensationStepsMultiColumn.append(sdrs)
     sensationStepsSingleColumn.append({0: sdrs[0]})
-
-  # print "inference: multi-columns "
-  # exp3.sendReset()
-  # l2ActiveCellsMultiColumn = []
-  # L2ActiveCellNVsTimeMultiColumn = []
-  # for sensation in sensationStepsMultiColumn:
-  #   exp3.infer([sensation], objectName=objectId, reset=False)
-  #   l2ActiveCellsMultiColumn.append(exp3.getL2Representations())
-  #   activeCellNum = 0
-  #   for c in range(numColumns):
-  #     activeCellNum += len(exp3.getL2Representations()[c])
-  #   L2ActiveCellNVsTimeMultiColumn.append(activeCellNum / numColumns)
 
   print "inference: single column "
   exp1.sendReset()

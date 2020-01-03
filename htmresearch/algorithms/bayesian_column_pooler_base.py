@@ -369,11 +369,13 @@ class BayesianColumnPoolerBase(object):
 
         # Forgetting process for values that doesn't get feed forward input
         self.activeCells -= self.forgetting*self.activeCells
+
         # Update cell values with new activation
-        # Activation is either 1 (for every feed forward input) or it is set to the activation itself
-        self.activeCells[
-            feedForwardActivation > 0.0
-            ] = feedForwardActivation[feedForwardActivation > 0.0] if self.useProximalProbabilities else 1
+        # Activation is either 1 (for every feed forward input) or it is set to the maximum from the new activation/discounted timestep t-1 activation
+        if self.useProximalProbabilities:
+            self.activeCells = np.maximum(self.activeCells, feedForwardActivation)
+        else:
+            self.activeCells[feedForwardActivation > 0.0] = 1
 
         # Compute activePredition cells based on activity and support
         activity = self.activeCells.copy()
@@ -385,7 +387,7 @@ class BayesianColumnPoolerBase(object):
                                              self.noise)
 
             for i, lateralInput in enumerate(lateralInputs):
-                activity *= self._activation(self.distalWeights[i], lateralInput, self.distalBias[i], self.noise)
+                activity += self._activation(self.distalWeights[i], lateralInput, self.distalBias[i], self.noise)
 
         self.activePredictionCells = activity
 
