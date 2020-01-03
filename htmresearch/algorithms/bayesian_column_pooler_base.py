@@ -387,7 +387,7 @@ class BayesianColumnPoolerBase(object):
                                              self.noise)
 
             for i, lateralInput in enumerate(lateralInputs):
-                activity += self._activation(self.distalWeights[i], lateralInput, self.distalBias[i], self.noise)
+                activity *= self._activation(self.distalWeights[i], lateralInput, self.distalBias[i], self.noise)
 
         self.activePredictionCells = activity
 
