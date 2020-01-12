@@ -43,7 +43,7 @@ def main():
     print "\n\nSumming Bayesian"
     for element in cart_prod:
         os.system("python %s/tests/bayesian/bayesian_convergence_activity_plot.py "
-                  "--implementation SummingBayesian"
+                  "--implementation SummingBayesian "
                   "--forgetting %s "
                   "--outputCount %s "
                   "--cellCount %s "
