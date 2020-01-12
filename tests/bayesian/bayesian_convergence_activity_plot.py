@@ -37,6 +37,17 @@ from htmresearch.frameworks.layers.object_machine_factory import (
 
 import argparse
 
+
+def str2bool(v):
+  if isinstance(v, bool):
+    return v
+  if v.lower() in ('yes', 'true', 't', 'y', '1'):
+    return True
+  elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+    return False
+  else:
+    raise argparse.ArgumentTypeError('Boolean value expected.')
+
 def parse_cmd():
     parser = argparse.ArgumentParser(description='L4L2 Experiment')
     parser.add_argument('--implementation', type=str)
@@ -46,8 +57,8 @@ def parse_cmd():
     parser.add_argument('--cellCount', type=int)
     parser.add_argument('--sdrSize', type=int)
     parser.add_argument('--outputActivation', type=float)
-    parser.add_argument('--useSupport', type=bool)
-    parser.add_argument('--useApicalTiebreak', type=bool)
+    parser.add_argument('--useSupport', type=str2bool)
+    parser.add_argument('--useApicalTiebreak', type=str2bool)
 
     parsed_args = parser.parse_args()
 
@@ -462,5 +473,5 @@ def runExperiment(arguments):
 if __name__ == "__main__":
   parsed_args = parse_cmd()
   print parsed_args
-  runExperiment(parsed_args)
+  # runExperiment(parsed_args)
 
