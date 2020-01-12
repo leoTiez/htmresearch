@@ -231,7 +231,7 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
         segmentActivityCount += segments.astype('int64')
 
         # Updating moving average input activity
-        inputCount += inputValues.reshape(-1).astype('int64')
+        inputCount += inputValues.astype('int64')
 
         if isBasal:
             self._setBasalConnectionData(
@@ -265,5 +265,7 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
     def _updateBias(self, isBasal=True):
         activationCount = self.basalSegmentActivationCount if isBasal else self.apicalSegmentActivationCount
         bias = np.log(activationCount / float(self.updateCounter))
+        bias[np.isneginf(bias)] = np.log(1 / float(self.updateCounter**2))
+
         return bias
 
