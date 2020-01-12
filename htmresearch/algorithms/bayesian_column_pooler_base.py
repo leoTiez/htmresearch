@@ -294,17 +294,16 @@ class BayesianColumnPoolerBase(object):
             # Randomly activate sdrSize bits from an array with cellCount bits
             self.activeCells = BayesianColumnPoolerBase._randomActivation(self.cellCount, self.sdrSize, self._random)
 
-            self._beforeUpdate(connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["internalDistal"])
-            self._updateConnectionData(connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["internalDistal"])
-            self._afterUpdate(connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["internalDistal"])
-
-            # Internal distal learning
-            # Pattern does not change while output neurons are kept constantly active, hence weights only needed to be
-            # updated once
-            self.internalDistalWeights, \
-            self.internalDistalBias = self._learn(
-                connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["internalDistal"]
-            )
+        self._beforeUpdate(connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["internalDistal"])
+        self._updateConnectionData(connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["internalDistal"])
+        self._afterUpdate(connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["internalDistal"])
+        # Internal distal learning
+        # Pattern does not change while output neurons are kept constantly active, hence weights only needed to be
+        # updated once
+        self.internalDistalWeights, \
+        self.internalDistalBias = self._learn(
+            connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["internalDistal"]
+        )
 
         # Update Counts for proximal weights
         self._beforeUpdate(connectionIndicator=BayesianColumnPoolerBase.CONNECTION_ENUM["proximal"])
@@ -371,9 +370,10 @@ class BayesianColumnPoolerBase(object):
         # Update cell values with new activation
         # Activation is either 1 (for every feed forward input) or it is set to the maximum from the new activation/discounted timestep t-1 activation
         if self.useProximalProbabilities:
+            feedForwardActivation[feedForwardActivation < self.activationThreshold] = 0
             self.activeCells = np.maximum(self.activeCells, feedForwardActivation)
         else:
-            self.activeCells[feedForwardActivation > 0.0] = 1
+            self.activeCells[feedForwardActivation > self.activationThreshold] = 1
 
         activity = self.activeCells.copy()
 
@@ -421,7 +421,8 @@ class BayesianColumnPoolerBase(object):
     def _activation(weights, input, bias, noise, useBias=True, ignoreNinf=False):
         # To avoid explosion of activation value the input is normalised
         # It's made sure that all weight values are set. Hence we can make use of simple matrix multiplication
-        transformed_input = input / float(input.sum())
+        normalization = float(input.sum())
+        transformed_input = input / normalization if normalization > 0 else np.zeros(input.shape)
         activation = weights.dot(transformed_input) if not useBias else weights.dot(transformed_input) + bias
         return np.exp(activation)
 
@@ -480,13 +481,17 @@ class BayesianColumnPoolerBase(object):
         # If support is used, activity is no probabilities anymore
         # THus the threshold can be lower than 0
         activity = self.activeCells if not self.useSupport else self.activePredictionCells
-        threshold = 0.0 if not self.useSupport else np.NINF
+        threshold = 0.01 if activity[activity > 0.01].shape[0] > 0 else 0.0 # if not self.useSupport else np.NINF
 
         # No probabilities anymore, thus do not filter for values greater than 0
         zippedActivation = filter(lambda x: x[1] > threshold, zip(range(len(activity)), activity))
         zippedActivation.sort(key=lambda t: t[1])
         zippedActivation.reverse()
-        indices, support = zip(*zippedActivation[:self.sdrSize])
+        # if len(zippedActivation) >= self.sdrSize:
+        #     indices, support = zip(*zippedActivation[:self.sdrSize])
+        # else:
+        #     indices, support = zip(*zippedActivation)
+        indices, support = zip(*zippedActivation)
 
         return list(indices)
 

@@ -193,14 +193,12 @@ class BayesianColumnPooler(BayesianColumnPoolerBase):
             movingAverage = self.proximalMovingAverages
             movingAverageBias = self.proximalMovingAverageBias
             movingAverageInput = self.proximalMovingAverageInput
-
         elif connectionIndicator == self.CONNECTION_ENUM["internalDistal"]:
             inputValues = self.activeCells
             inputSize = self.cellCount
             movingAverage = self.internalDistalMovingAverages
             movingAverageBias = self.internalDistalMovingAverageBias
             movingAverageInput = self.internalDistalMovingAverageInput
-
         elif connectionIndicator == self.CONNECTION_ENUM["distal"]:
             inputValues = kwargs["inputValues"]
             index = kwargs["index"]
@@ -208,7 +206,6 @@ class BayesianColumnPooler(BayesianColumnPoolerBase):
             movingAverage = self.distalMovingAverages[index]
             movingAverageBias = self.distalMovingAverageBias[index]
             movingAverageInput = self.distalMovingAverageInput[index]
-
         else:
             raise AssertionError("Connection indicator is set to an invalid value.\n"
                                  "Valid parameter values = proximal, internalDistal and distal")
@@ -217,7 +214,9 @@ class BayesianColumnPooler(BayesianColumnPoolerBase):
         # neuron is only active for one particular pattern or few ones. Hence, the more update steps are taken the less the
         # neuron becomes activated and thus the weights are more decreased. This leads to a forgetting mechanism that is
         # not desired in a sparse representation
+
         active_cells_indices = self.getActiveCellsIndices()
+        input_mask = inputValues > 0
         # Updating moving average weights to input
         noisy_connection_matrix = np.outer((1 - self.noise ** 2) * self.activeCells, inputValues)
         # Consider only active segments
@@ -236,7 +235,6 @@ class BayesianColumnPooler(BayesianColumnPoolerBase):
         )
 
         # Updating moving average input activity
-        input_mask = inputValues > 0
         noisy_input_vector = (1 - self.noise) * inputValues
         # Consider only active segments
         noisy_input_vector[noisy_input_vector > 0] += self.noise

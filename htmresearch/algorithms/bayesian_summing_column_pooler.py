@@ -275,6 +275,7 @@ class BayesianSummingColumnPooler(BayesianColumnPoolerBase):
                                  "Valid parameter values = proximal, internalDistal and distal")
 
         bias = np.log(activationCount / float(updateCounter))
+        bias[np.isneginf(bias)] = np.log(1 / float(updateCounter ** 2))
         return bias
 
     ###################################################################################################################
