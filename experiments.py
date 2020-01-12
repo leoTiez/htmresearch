@@ -26,6 +26,7 @@ def main():
     cwd = os.getcwd()
     print "\n\nIncremental Bayesian"
     for element in cart_prod:
+        print element
         os.system("python %s/tests/bayesian/bayesian_convergence_activity_plot.py "
                   "--implementation Bayesian "
                   "--learningRate %s "
@@ -40,6 +41,16 @@ def main():
                      element[4], element[5], element[6], element[7])
                   )
 
+    cart_prod = product(
+        forgettings,
+        outputCellCounts,
+        cellsCounts,
+        sdrSizes,
+        outputActivation,
+        useSupport,
+        useApicalTiebreak,
+    )
+    
     print "\n\nSumming Bayesian"
     for element in cart_prod:
         os.system("python %s/tests/bayesian/bayesian_convergence_activity_plot.py "
@@ -51,8 +62,8 @@ def main():
                   "--outputActivation %s "
                   "--useSupport %s "
                   "--useApicalTiebreak %s >> plot_test_summing_exp.txt"
-                  % (cwd, element[1], element[2], element[3], element[4],
-                     element[5], element[6], element[7])
+                  % (cwd, element[0], element[1], element[2], element[3],
+                     element[4], element[5], element[6])
                   )
 
     os.system("python %s/tests/bayesian/cp_gran_object_test.py "
