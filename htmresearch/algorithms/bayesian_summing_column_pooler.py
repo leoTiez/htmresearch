@@ -159,16 +159,16 @@ class BayesianSummingColumnPooler(BayesianColumnPoolerBase):
             seed=seed
         )
 
-        self.distalConnectionCounts = list(np.zeros((self.cellCount, n), dtype='int32') for n in lateralInputWidths)
-        self.internalDistalConnectionCount = np.zeros((self.cellCount, self.cellCount), dtype='int32')
-        self.proximalConnectionCount = np.zeros((self.cellCount, self.inputWidth), dtype='int32')
+        self.distalConnectionCounts = list(np.zeros((self.cellCount, n), dtype='float16') for n in lateralInputWidths)
+        self.internalDistalConnectionCount = np.zeros((self.cellCount, self.cellCount), dtype='float16')
+        self.proximalConnectionCount = np.zeros((self.cellCount, self.inputWidth), dtype='float16')
 
-        self.distalCellActivityCounts = list(np.zeros(self.cellCount, dtype='int32') for _n in lateralInputWidths)
-        self.internalDistalCellActivityCount = np.zeros(self.cellCount, dtype='int32')
-        self.proximalCellActivityCount = np.zeros(self.cellCount, dtype='int32')
+        self.distalCellActivityCounts = list(np.zeros(self.cellCount, dtype='float16') for _n in lateralInputWidths)
+        self.internalDistalCellActivityCount = np.zeros(self.cellCount, dtype='float16')
+        self.proximalCellActivityCount = np.zeros(self.cellCount, dtype='float16')
 
-        self.distalInputCounts = list(np.zeros(n, dtype='int32') for n in lateralInputWidths)
-        self.proximalInputCount = np.zeros(self.inputWidth, dtype='int32')
+        self.distalInputCounts = list(np.zeros(n, dtype='float16') for n in lateralInputWidths)
+        self.proximalInputCount = np.zeros(self.inputWidth, dtype='float16')
 
         self.updateCounter = 0
         self.numberOfObjects = 0
@@ -278,7 +278,7 @@ class BayesianSummingColumnPooler(BayesianColumnPoolerBase):
     ###################################################################################################################
 
     def _resetProximalCounter(self):
-        self.proximalConnectionCount = np.zeros(self.proximalConnectionCount.shape, dtype='int32')
-        self.proximalCellActivityCount = np.zeros(self.proximalCellActivityCount.shape, dtype='int32')
-        self.proximalInputCount = np.zeros(self.proximalInputCount.shape, dtype='int32')
+        self.proximalConnectionCount = np.zeros(self.proximalConnectionCount.shape, dtype='float16')
+        self.proximalCellActivityCount = np.zeros(self.proximalCellActivityCount.shape, dtype='float16')
+        self.proximalInputCount = np.zeros(self.proximalInputCount.shape, dtype='float16')
 
