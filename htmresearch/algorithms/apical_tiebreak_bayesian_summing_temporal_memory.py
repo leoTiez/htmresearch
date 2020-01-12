@@ -117,12 +117,12 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
             seed=seed
         )
 
-        self.basalConnectionCount = np.zeros((1, self.numberOfCells(), self.basalInputSize), dtype='int32')
-        self.apicalConnectionCount = np.zeros((1, self.numberOfCells(), self.apicalInputSize), dtype='int32')
-        self.basalSegmentActivationCount = np.zeros((1, self.numberOfCells()), dtype='int32')
-        self.apicalSegmentActivationCount = np.zeros((1, self.numberOfCells()), dtype='int32')
-        self.basalInputCount = np.zeros(self.basalInputSize, dtype='int32')
-        self.apicalInputCount = np.zeros(self.apicalInputSize, dtype='int32')
+        self.basalConnectionCount = np.zeros((1, self.numberOfCells(), self.basalInputSize), dtype='float16')
+        self.apicalConnectionCount = np.zeros((1, self.numberOfCells(), self.apicalInputSize), dtype='float16')
+        self.basalSegmentActivationCount = np.zeros((1, self.numberOfCells()), dtype='float16')
+        self.apicalSegmentActivationCount = np.zeros((1, self.numberOfCells()), dtype='float16')
+        self.basalInputCount = np.zeros(self.basalInputSize, dtype='float16')
+        self.apicalInputCount = np.zeros(self.apicalInputSize, dtype='float16')
         self.updateCounter = 0
 
     def _addNewSegments(self, isBasal=True):
@@ -225,13 +225,13 @@ class SummingBayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemo
         connection_matrix = np.outer(segments, inputValues)
         # Consider only active segments
         connection_matrix = connection_matrix.reshape(numSegments, self.numberOfCells(), connectionCount.shape[-1])
-        connectionCount += connection_matrix.astype('int32')
+        connectionCount += connection_matrix.astype('float16')
 
         # Updating moving average bias of each segment
-        segmentActivityCount += segments.astype('int32')
+        segmentActivityCount += segments.astype('float16')
 
         # Updating moving average input activity
-        inputCount += inputValues.astype('int32')
+        inputCount += inputValues.astype('float16')
 
         if isBasal:
             self._setBasalConnectionData(
