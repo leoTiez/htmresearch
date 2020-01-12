@@ -121,35 +121,35 @@ class ApicalTiebreakBayesianTemporalMemoryBase(object):
         # We use a continuous weight matrix
         # Three dimensional to have weight from every input to every segment with mapping from segment to cell
         self.basalWeights = np.zeros(
-            (self.numBasalSegments, self.columnCount*self.cellsPerColumn, self.basalInputSize))
+            (self.numBasalSegments, self.columnCount*self.cellsPerColumn, self.basalInputSize), dtype='float16')
         self.apicalWeights = np.zeros(
-            (self.numApicalSegments, self.columnCount*self.cellsPerColumn, self.apicalInputSize))
-        self.basalBias = np.zeros((self.numBasalSegments, self.columnCount*self.cellsPerColumn))
-        self.apicalBias = np.zeros((self.numApicalSegments, self.columnCount*self.cellsPerColumn))
+            (self.numApicalSegments, self.columnCount*self.cellsPerColumn, self.apicalInputSize), dtype='float16')
+        self.basalBias = np.zeros((self.numBasalSegments, self.columnCount*self.cellsPerColumn), dtype='float16')
+        self.apicalBias = np.zeros((self.numApicalSegments, self.columnCount*self.cellsPerColumn), dtype='float16')
 
         # Set to zero to use randomly initialized first weight value
-        self.basalSegmentCount = np.ones((self.columnCount, self.cellsPerColumn))
-        self.apicalSegmentCount = np.ones((self.columnCount, self.cellsPerColumn))
+        self.basalSegmentCount = np.ones((self.columnCount, self.cellsPerColumn), dtype='float16')
+        self.apicalSegmentCount = np.ones((self.columnCount, self.cellsPerColumn), dtype='float16')
 
         # Changed to float64 to model continuous values
-        self.predictedCells = np.zeros(self.numberOfCells(), dtype="float64")
-        self.activeBasalSegments = np.zeros((self.maxSegmentsPerCell, self.numberOfCells()), dtype="float64")
-        self.activeApicalSegments = np.zeros((self.maxSegmentsPerCell, self.numberOfCells()), dtype="float64")
-        self.apicalInput = np.zeros(self.apicalInputSize, dtype="float64")
-        self.basalInput = np.zeros(self.basalInputSize, dtype="float64")
-        self.activeCells = np.zeros(self.numberOfCells(), dtype="float64")
+        self.predictedCells = np.zeros(self.numberOfCells(), dtype='float16')
+        self.activeBasalSegments = np.zeros((self.maxSegmentsPerCell, self.numberOfCells()), dtype="float16")
+        self.activeApicalSegments = np.zeros((self.maxSegmentsPerCell, self.numberOfCells()), dtype="float16")
+        self.apicalInput = np.zeros(self.apicalInputSize, dtype="float16")
+        self.basalInput = np.zeros(self.basalInputSize, dtype="float16")
+        self.activeCells = np.zeros(self.numberOfCells(), dtype="float16")
 
     def reset(self):
         """
         Clear all cell and segment activity.
         """
         # Changed already to float64
-        self.predictedCells = np.zeros(self.numberOfCells(), dtype="float64")
-        self.activeBasalSegments = np.zeros((self.maxSegmentsPerCell, self.numberOfCells()), dtype="float64")
-        self.activeApicalSegments = np.zeros((self.maxSegmentsPerCell, self.numberOfCells()), dtype="float64")
-        self.apicalInput = np.zeros(self.apicalInputSize, dtype="float64")
-        self.basalInput = np.zeros(self.basalInputSize, dtype="float64")
-        self.activeCells = np.zeros(self.numberOfCells(), dtype="float64")
+        self.predictedCells = np.zeros(self.numberOfCells(), dtype="float16")
+        self.activeBasalSegments = np.zeros((self.maxSegmentsPerCell, self.numberOfCells()), dtype="float16")
+        self.activeApicalSegments = np.zeros((self.maxSegmentsPerCell, self.numberOfCells()), dtype="float16")
+        self.apicalInput = np.zeros(self.apicalInputSize, dtype="float16")
+        self.basalInput = np.zeros(self.basalInputSize, dtype="float16")
+        self.activeCells = np.zeros(self.numberOfCells(), dtype="float16")
 
     def compute(self,
                 activeColumns,
