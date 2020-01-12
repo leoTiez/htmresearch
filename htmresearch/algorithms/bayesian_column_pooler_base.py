@@ -163,9 +163,9 @@ class BayesianColumnPoolerBase(object):
         self.sampleSizeDistal = sampleSizeDistal
         self.inertiaFactor = inertiaFactor
 
-        self.prevActiveCells = np.zeros(self.cellCount, dtype="float64")
-        self.activeCells = np.zeros(self.cellCount, dtype="float64")
-        self.activePredictionCells = np.zeros(self.cellCount, dtype="float64")
+        self.prevActiveCells = np.zeros(self.cellCount, dtype="float16")
+        self.activeCells = np.zeros(self.cellCount, dtype="float16")
+        self.activePredictionCells = np.zeros(self.cellCount, dtype="float16")
         self._random = Random(seed)
         self.useInertia=True
 
@@ -174,13 +174,13 @@ class BayesianColumnPoolerBase(object):
 
         # Weights 2D-Matrix - (1 segment per) cells x distalInput
         # Needs to be split up, because each segment only connects to the specified input
-        self.distalWeights = list(np.zeros((self.cellCount, n)) for n in lateralInputWidths)
-        self.internalDistalWeights = np.zeros((self.cellCount, self.cellCount))
-        self.proximalWeights = np.zeros((self.cellCount, self.inputWidth))
+        self.distalWeights = list(np.zeros((self.cellCount, n), dtype='float16') for n in lateralInputWidths)
+        self.internalDistalWeights = np.zeros((self.cellCount, self.cellCount), dtype='float16')
+        self.proximalWeights = np.zeros((self.cellCount, self.inputWidth), dtype='float16')
 
-        self.distalBias = list(np.zeros(self.cellCount) for n in lateralInputWidths)
-        self.internalDistalBias = np.zeros(self.cellCount)
-        self.proximalBias = np.zeros(self.cellCount)
+        self.distalBias = list(np.zeros(self.cellCount, dtype='float16') for _ in lateralInputWidths)
+        self.internalDistalBias = np.zeros(self.cellCount, dtype='float16')
+        self.proximalBias = np.zeros(self.cellCount, dtype='float16')
 
         self.noise = noise
         self.activationThreshold = activationThreshold
@@ -196,9 +196,9 @@ class BayesianColumnPoolerBase(object):
         Reset internal states. When learning this signifies we are to learn a
         unique new object.
         """
-        self.prevActiveCells = np.zeros(self.cellCount, dtype="float64")
-        self.activeCells = np.zeros(self.cellCount, dtype="float64")
-        self.activePredictionCells = np.zeros(self.cellCount, dtype="float64")
+        self.prevActiveCells = np.zeros(self.cellCount, dtype="float16")
+        self.activeCells = np.zeros(self.cellCount, dtype="float16")
+        self.activePredictionCells = np.zeros(self.cellCount, dtype="float16")
 
     def compute(
             self,
@@ -429,7 +429,7 @@ class BayesianColumnPoolerBase(object):
     @staticmethod
     def _randomActivation(n, k, randomizer):
         # Activate k from n bits, randomly (using custom randomizer for reproducibility)
-        activeCells = np.zeros(n, dtype="float64")
+        activeCells = np.zeros(n, dtype="float16")
         indices = BayesianColumnPoolerBase._sampleRange(randomizer, 0, n, step=1, k=k)
         activeCells[indices] = 1
         return activeCells
