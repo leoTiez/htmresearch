@@ -171,17 +171,23 @@ class BayesianColumnPooler(BayesianColumnPoolerBase):
         if initMovingAverages == 0:
             initMovingAverages = self.noise**2
 
-        self.distalMovingAverages = list(np.full((self.cellCount, n), initMovingAverages) for n in lateralInputWidths)
-        self.internalDistalMovingAverages = np.full((self.cellCount, self.cellCount), initMovingAverages)
-        self.proximalMovingAverages = np.full((self.cellCount, self.inputWidth), initMovingAverages)
+        self.distalMovingAverages = list(
+            np.full((self.cellCount, n), initMovingAverages, dtype='float16') for n in lateralInputWidths
+        )
+        self.internalDistalMovingAverages = np.full((self.cellCount, self.cellCount),
+                                                    initMovingAverages,
+                                                    dtype='float16')
+        self.proximalMovingAverages = np.full((self.cellCount, self.inputWidth), initMovingAverages, dtype='float16')
 
-        self.distalMovingAverageBias = list(np.full(self.cellCount, initMovingAverages) for _ in lateralInputWidths)
-        self.internalDistalMovingAverageBias = np.full(self.cellCount, initMovingAverages)
-        self.proximalMovingAverageBias = np.full(self.cellCount, initMovingAverages)
+        self.distalMovingAverageBias = list(
+            np.full(self.cellCount, initMovingAverages, dtype='float16') for _ in lateralInputWidths
+        )
+        self.internalDistalMovingAverageBias = np.full(self.cellCount, initMovingAverages, dtype='float16')
+        self.proximalMovingAverageBias = np.full(self.cellCount, initMovingAverages, dtype='float16')
 
-        self.distalMovingAverageInput = list(np.full(n, initMovingAverages) for n in lateralInputWidths)
-        self.internalDistalMovingAverageInput = np.full(self.cellCount, initMovingAverages)
-        self.proximalMovingAverageInput = np.full(self.inputWidth, initMovingAverages)
+        self.distalMovingAverageInput = list(np.full(n, initMovingAverages, dtype='float16') for n in lateralInputWidths)
+        self.internalDistalMovingAverageInput = np.full(self.cellCount, initMovingAverages, dtype='float16')
+        self.proximalMovingAverageInput = np.full(self.inputWidth, initMovingAverages, dtype='float16')
 
     def _beforeUpdate(self, connectionIndicator):
         pass

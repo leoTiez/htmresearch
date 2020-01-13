@@ -280,7 +280,7 @@ def runExperiment(numOfRuns):
       featureLocations.append({0: objects[i][j][0]})
     objectsSingleColumn[i] = featureLocations
 
-  cellsPerColumn = 16
+  cellsPerColumn = 8
   outputCells = 128
   # params
   maxNumSegments = 16
