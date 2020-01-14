@@ -501,24 +501,21 @@ if __name__ == "__main__":
     useSupport=True
   )
 
-  print  "Implementations"
+  print  "Average activity"
   parsed_args = initial_args
-  implementations = ["Bayesian", "SummingBayesian"]
   activation_list = []
   converged_list = []
   time_diff = 0
   counter = 0
-
   start = time.time()
-  for element in implementations:
-    parsed_args.implementation = element
-    result = runExperiment(parsed_args)
-    activation_list.append(result[0])
-    converged_list.append(result[2])
-    counter += 1
+  result = runExperiment(parsed_args)
+  activation_list.append(result[0])
+  activation_list.append(result[1])
+  converged_list.append(result[2])
+  counter += 1
   end = time.time()
   time_diff += end - start
 
-  legend_names = ["Incremental", "Summing"]
-  plotAverageActivity(activation_list, converged_list, legend_names, name="incremental_summing")
+  legend_names = ["Object representation", "All cells"]
+  plotAverageActivity(activation_list, converged_list, legend_names, name="average_activity")
 
