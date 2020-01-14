@@ -563,8 +563,7 @@ if __name__ == "__main__":
   legend_names = ["Object representation", "All cells"]
   plotAverageActivity(activation_list, converged_list, legend_names, name="average_activity_5")
 
-  print
-  "Average activity 20"
+  print "Average activity 20"
   parsed_args = initial_args
   parsed_args.sdrSize = 20
   activation_list = []
