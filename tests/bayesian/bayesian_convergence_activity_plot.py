@@ -512,7 +512,7 @@ if __name__ == "__main__":
   counter = 0
 
   start = time.time()
-  for num, element in range(5):
+  for _ in range(5):
     parsed_args.implementation = "SummingBayesian"
     result = runExperiment(parsed_args)
     # activation_list.append(result[0])
