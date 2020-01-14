@@ -493,9 +493,9 @@ if __name__ == "__main__":
     implementation="Bayesian",
     learningRate=0.01,
     forgetting=0.0,
-    outputCount=1024,
+    outputCount=128,
     sdrSize=5,
-    outputActivation=0.3,
+    outputActivation=0.1,
     cellCount=8,
     useApicalTiebreak=True,
     useSupport=True
