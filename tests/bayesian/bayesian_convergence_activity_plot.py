@@ -23,6 +23,9 @@
 """
 This file plots activity of single vs multiple columns as they converge.
 """
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 import os
 import random
@@ -36,7 +39,7 @@ from htmresearch.frameworks.layers.object_machine_factory import (
 )
 
 import argparse
-
+import time
 
 def str2bool(v):
   if isinstance(v, bool):
@@ -274,7 +277,15 @@ def plotL2ObjectRepresentations(exp1):
                                 filename='plots/target_object_representations.pdf',
                                 scale=4)
 
-
+def plotAverageActivity(activities_over_time, converged_list, legend_names, name="tiebreak_support_test"):
+  plt.clf()
+  for activity_over_time, converged, legend_name in zip(activities_over_time, converged_list, legend_names):
+    average_cell_activity = np.asarray(np.mean(activity_over_time, axis=1))
+    plt.plot(range(average_cell_activity.shape[0]), average_cell_activity, label=legend_name)
+    if converged is not None:
+      plt.plot(converged, average_cell_activity[converged], 'o')
+  plt.legend()
+  plt.savefig('%s.png' % name)
 
 def runExperiment(arguments):
   """
@@ -394,13 +405,18 @@ def runExperiment(arguments):
     sensationStepsMultiColumn.append(sdrs)
     sensationStepsSingleColumn.append({0: sdrs[0]})
 
-  print "inference: single column "
+  print  "inference: single column "
   exp1.sendReset()
   l2ActiveCellsSingleColumn = []
   L2ActiveCellNVsTimeSingleColumn = []
+  l2ActiveValues = []
+  l2ActiveValuesRepresentation = []
   for sensation in sensationStepsSingleColumn:
     exp1.infer([sensation], objectName=objectId, reset=False)
     l2ActiveCellsSingleColumn.append(exp1.getL2Prediction())
+    cellActivity = exp1.getActiveCellValues()[0]
+    l2ActiveValuesRepresentation.append(cellActivity[list(exp1.objectL2Representations[objectId][0])])
+    l2ActiveValues.append(cellActivity)
     L2ActiveCellNVsTimeSingleColumn.append(len(exp1.getL2Prediction()[0]))
 
   # Used to figure out where to put the red rectangle!
@@ -413,28 +429,30 @@ def runExperiment(arguments):
     (idx for idx, value in enumerate(l2ActiveCellsSingleColumn)
      if (value[0] == firstObjectRepresentation)), None)
 
-  print "Exactly SDR-Size activity (%s) after %s steps" % (sdrSize, singleColumnHighlight)
-  print "Converged to first object representation after %s steps" % converged
-
-  print "Overlaps of each l2-representation (after new sensation) to each object"
+  print  "Converged to first object representation after %s steps" % converged
+  print  "Exactly SDR-Size activity (%s) after %s steps" % (sdrSize, singleColumnHighlight)
+  print  "Overlaps of each l2-representation (after new sensation) to each object"
   for idx in range(0, len(l2ActiveCellsSingleColumn)):
-    print "overlap of l2-representation %s" % idx
+    print
+    "overlap of l2-representation %s" % idx
     for i in range(0, len(exp1.objectL2Representations)):
       object = exp1.objectL2Representations[i][0]
       l2Representation = l2ActiveCellsSingleColumn[idx][0]
       overlap = len(l2Representation.intersection(object))
       print "\tTo object %s is %s/%s" % (i, overlap, len(l2Representation))
 
-  print "First Object representation", np.sort(list(firstObjectRepresentation))
-
-  print "\n\nL2 Output over steps"
-  for idx in range(0, len(l2ActiveCellsSingleColumn)):
-    rep = np.sort(list(l2ActiveCellsSingleColumn[idx][0]))
-    print len(rep), rep
-  print "\n\nObject representations L2"
-  for idx in range(0, len(exp1.objectL2Representations)):
-    obj = np.sort(list(exp1.objectL2Representations[idx][0]))
-    print len(obj), obj
+  return l2ActiveValuesRepresentation, l2ActiveValues, converged
+  #
+  # print "First Object representation", np.sort(list(firstObjectRepresentation))
+  #
+  # print "\n\nL2 Output over steps"
+  # for idx in range(0, len(l2ActiveCellsSingleColumn)):
+  #   rep = np.sort(list(l2ActiveCellsSingleColumn[idx][0]))
+  #   print len(rep), rep
+  # print "\n\nObject representations L2"
+  # for idx in range(0, len(exp1.objectL2Representations)):
+  #   obj = np.sort(list(exp1.objectL2Representations[idx][0]))
+  #   print len(obj), obj
 
   # plotActivity(l2ActiveCellsSingleColumn, singleColumnHighlight)
   # plotL2ObjectRepresentations(exp1)
@@ -471,7 +489,36 @@ def runExperiment(arguments):
 
 
 if __name__ == "__main__":
-  parsed_args = parse_cmd()
-  print parsed_args
-  # runExperiment(parsed_args)
+  initial_args = argparse.Namespace(
+    implementation="Bayesian",
+    learningRate=0.01,
+    forgetting=0.0,
+    outputCount=1024,
+    sdrSize=5,
+    outputActivation=0.3,
+    cellCount=8,
+    useApicalTiebreak=True,
+    useSupport=True
+  )
+
+  print  "Implementations"
+  parsed_args = initial_args
+  implementations = ["Bayesian", "SummingBayesian"]
+  activation_list = []
+  converged_list = []
+  time_diff = 0
+  counter = 0
+
+  start = time.time()
+  for element in implementations:
+    parsed_args.implementation = element
+    result = runExperiment(parsed_args)
+    activation_list.append(result[0])
+    converged_list.append(result[2])
+    counter += 1
+  end = time.time()
+  time_diff += end - start
+
+  legend_names = ["Incremental", "Summing"]
+  plotAverageActivity(activation_list, converged_list, legend_names, name="incremental_summing")
 
