@@ -501,17 +501,36 @@ if __name__ == "__main__":
     useSupport=True
   )
 
-  print "Implementations"
-  parsed_args = initial_args
-  implementations = ["Bayesian", "SummingBayesian"]
-  activation_list = []
-  converged_list = []
+  # print "Implementations"
+  # parsed_args = initial_args
+  # implementations = ["Bayesian", "SummingBayesian"]
+  # activation_list = []
+  # converged_list = []
   time_diff = 0
   counter = 0
+  #
+  # start = time.time()
+  # for element in implementations:
+  #   parsed_args.implementation = element
+  #   result = runExperiment(parsed_args)
+  #   activation_list.append(result[0])
+  #   converged_list.append(result[2])
+  #   counter += 1
+  # end = time.time()
+  # time_diff += end - start
+  #
+  # legend_names = ["Incremental", "Summing"]
+  # plotAverageActivity(activation_list, converged_list, legend_names, name="incremental_summing")
+
+  print  "Apical"
+  parsed_args = initial_args
+  flags = [True, False]
+  activation_list = []
+  converged_list = []
 
   start = time.time()
-  for element in implementations:
-    parsed_args.implementation = element
+  for element in flags:
+    parsed_args.useApicalTiebreak = element
     result = runExperiment(parsed_args)
     activation_list.append(result[0])
     converged_list.append(result[2])
@@ -519,62 +538,43 @@ if __name__ == "__main__":
   end = time.time()
   time_diff += end - start
 
-  legend_names = ["Incremental", "Summing"]
-  plotAverageActivity(activation_list, converged_list, legend_names, name="incremental_summing")
+  legend_names = ["Use apical", "No apical"]
+  plotAverageActivity(activation_list, converged_list, legend_names, name="apical")
 
-  # print  "Apical"
-  # parsed_args = initial_args
-  # flags = [True, False]
-  # activation_list = []
-  # converged_list = []
-  #
-  # start = time.time()
-  # for element in flags:
-  #   parsed_args.useApicalTiebreak = element
-  #   result = runExperiment(parsed_args)
-  #   activation_list.append(result[0])
-  #   converged_list.append(result[2])
-  #   counter += 1
-  # end = time.time()
-  # time_diff += end - start
-  #
-  # legend_names = ["Use apical", "No apical"]
-  # plotAverageActivity(activation_list, converged_list, legend_names, name="apical")
-  #
-  # print  "Average activity"
-  # parsed_args = initial_args
-  # activation_list = []
-  # converged_list = []
-  # 
-  # start = time.time()
-  # result = runExperiment(parsed_args)
-  # activation_list.append(result[0])
-  # activation_list.append(result[1])
-  # converged_list.append(result[2])
-  # counter += 1
-  # end = time.time()
-  # time_diff += end - start
-  #
-  # legend_names = ["Object representation", "All cells"]
-  # plotAverageActivity(activation_list, converged_list, legend_names, name="average_activity")
-  #
-  # print  "Learning rate"
-  # parsed_args = initial_args
-  # learningRates = [0.01, 0.1, 0.5]
-  # activation_list = []
-  # converged_list = []
-  #
-  # start = time.time()
-  # for element in learningRates:
-  #   parsed_args.learningRate = element
-  #   result = runExperiment(parsed_args)
-  #   activation_list.append(result[0])
-  #   converged_list.append(result[2])
-  #   counter += 1
-  # end = time.time()
-  # time_diff += end - start
-  #
-  # legend_names = ["$\alpha$=0.01", "$\alpha$=0.1", "$\alpha$=0.5"]
-  # plotAverageActivity(activation_list, converged_list, legend_names, name="learning_rate")
-  #
+  print  "Average activity"
+  parsed_args = initial_args
+  activation_list = []
+  converged_list = []
+
+  start = time.time()
+  result = runExperiment(parsed_args)
+  activation_list.append(result[0])
+  activation_list.append(result[1])
+  converged_list.append(result[2])
+  counter += 1
+  end = time.time()
+  time_diff += end - start
+
+  legend_names = ["Object representation", "All cells"]
+  plotAverageActivity(activation_list, converged_list, legend_names, name="average_activity")
+
+  print  "Learning rate"
+  parsed_args = initial_args
+  learningRates = [0.01, 0.1, 0.5]
+  activation_list = []
+  converged_list = []
+
+  start = time.time()
+  for element in learningRates:
+    parsed_args.learningRate = element
+    result = runExperiment(parsed_args)
+    activation_list.append(result[0])
+    converged_list.append(result[2])
+    counter += 1
+  end = time.time()
+  time_diff += end - start
+
+  legend_names = ["$\alpha$=0.01", "$\alpha$=0.1", "$\alpha$=0.5"]
+  plotAverageActivity(activation_list, converged_list, legend_names, name="learning_rate")
+
   print  time_diff / float(counter)
