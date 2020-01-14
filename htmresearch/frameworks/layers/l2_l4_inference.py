@@ -762,7 +762,9 @@ class L4L2Experiment(object):
     """
     return [set(column._pooler.getObjectPrediction()) for column in self.L2Columns]
 
-
+  def getActiveCellValues(self):
+    return [column._pooler.getActiveCellValues() for column in self.L2Columns]
+  
   def getCurrentObjectOverlaps(self):
     """
     Get every L2's current overlap with each L2 object representation that has
