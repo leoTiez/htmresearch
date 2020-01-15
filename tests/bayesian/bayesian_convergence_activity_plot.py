@@ -283,7 +283,7 @@ def plotAverageActivity(activities_over_time, converged_list, legend_names, name
     average_cell_activity = np.asarray(np.mean(activity_over_time, axis=1))
     plt.plot(range(1, average_cell_activity.shape[0] + 1), average_cell_activity, label=legend_name)
     if converged is not None:
-      plt.plot(converged, average_cell_activity[converged], 'o')
+      plt.plot(converged + 1, average_cell_activity[converged], 'o')
   plt.xlabel('Sensation')
   plt.ylabel('Activity')
   plt.legend()
@@ -503,65 +503,65 @@ if __name__ == "__main__":
     useSupport=True
   )
 
-  print "Summing Implementations"
+  print "Implementations"
   parsed_args = initial_args
-  # implementations = ["Bayesian", "SummingBayesian"]
+  implementations = ["Bayesian", "SummingBayesian"]
   activation_list = []
   converged_list = []
   time_diff = 0
   counter = 0
 
   start = time.time()
-  for _ in range(5):
-    parsed_args.implementation = "SummingBayesian"
+  for element in implementations:
+    parsed_args.implementation = element
     result = runExperiment(parsed_args)
-    # activation_list.append(result[0])
-    # converged_list.append(result[2])
+    activation_list.append(result[0])
+    converged_list.append(result[2])
     counter += 1
 
   end = time.time()
   time_diff += end - start
 
-  # legend_names = ["Incremental", "Summing"]
-  # plotAverageActivity(activation_list, converged_list, legend_names, name="incremental_summing")
-  #
-  # print  "Apical"
-  # parsed_args = initial_args
-  # flags = [True, False]
-  # activation_list = []
-  # converged_list = []
-  #
-  # start = time.time()
-  # for element in flags:
-  #   parsed_args.useApicalTiebreak = element
-  #   result = runExperiment(parsed_args)
-  #   activation_list.append(result[0])
-  #   converged_list.append(result[2])
-  #   counter += 1
-  # end = time.time()
-  # time_diff += end - start
-  #
-  # legend_names = ["Use apical", "No apical"]
-  # plotAverageActivity(activation_list, converged_list, legend_names, name="apical")
-  #
-  # print  "Average activity 5"
-  # parsed_args = initial_args
-  # activation_list = []
-  # converged_list = []
-  #
-  # start = time.time()
-  # result = runExperiment(parsed_args)
-  # activation_list.append(result[0])
-  # activation_list.append(result[1])
-  # converged_list.append(result[2])
-  # converged_list.append(result[2])
-  # counter += 1
-  # end = time.time()
-  # time_diff += end - start
-  #
-  # legend_names = ["Object representation", "All cells"]
-  # plotAverageActivity(activation_list, converged_list, legend_names, name="average_activity_5")
-  #
+  legend_names = ["Incremental", "Summing"]
+  plotAverageActivity(activation_list, converged_list, legend_names, name="incremental_summing")
+
+  print  "Apical"
+  parsed_args = initial_args
+  flags = [True, False]
+  activation_list = []
+  converged_list = []
+
+  start = time.time()
+  for element in flags:
+    parsed_args.useApicalTiebreak = element
+    result = runExperiment(parsed_args)
+    activation_list.append(result[0])
+    converged_list.append(result[2])
+    counter += 1
+  end = time.time()
+  time_diff += end - start
+
+  legend_names = ["Use apical", "No apical"]
+  plotAverageActivity(activation_list, converged_list, legend_names, name="apical")
+
+  print  "Average activity 5"
+  parsed_args = initial_args
+  activation_list = []
+  converged_list = []
+
+  start = time.time()
+  result = runExperiment(parsed_args)
+  activation_list.append(result[0])
+  activation_list.append(result[1])
+  converged_list.append(result[2])
+  converged_list.append(result[2])
+  counter += 1
+  end = time.time()
+  time_diff += end - start
+
+  legend_names = ["Object representation", "All cells"]
+  plotAverageActivity(activation_list, converged_list, legend_names, name="average_activity_5")
+
   # print "Average activity 20"
   # parsed_args = initial_args
   # parsed_args.sdrSize = 20
@@ -600,4 +600,4 @@ if __name__ == "__main__":
   # legend_names = ["$\alpha$=0.01", "$\alpha$=0.1", "$\alpha$=0.5"]
   # plotAverageActivity(activation_list, converged_list, legend_names, name="learning_rate")
 
-  print  time_diff / float(counter)
+  # print  time_diff / float(counter)
