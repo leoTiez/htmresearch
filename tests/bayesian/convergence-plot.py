@@ -49,7 +49,7 @@ def plotActivity(l2ActiveCellsMultiColumn, highlightTouches):
     numColumns = len(l2ActiveCellsMultiColumn[0])
     fig = plotly.tools.make_subplots(
         rows=1, cols=numColumns, shared_yaxes=True,
-        subplot_titles=('Numenta (Single Column)', 'Bayesian Incremental', 'Bayesian Summing')[0:numColumns]
+        subplot_titles=('Numenta (Single Column)', 'Bayesian Summing', 'Bayesian Incremental')[0:numColumns]
     )
 
     data = go.Scatter(x=[], y=[])
