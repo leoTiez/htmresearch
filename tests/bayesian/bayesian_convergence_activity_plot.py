@@ -503,19 +503,33 @@ if __name__ == "__main__":
     useSupport=True
   )
 
-  print  "Output support"
+  print  "Forgetting"
   parsed_args = initial_args
-  flags = [True, False]
+  parsed_args.outputActivation = 0.3
+  forgetting = [0.0, 0.1, 0.2]
   activation_list = []
   converged_list = []
 
-  for element in flags:
-    parsed_args.useSupport = element
+  for element in forgetting:
+    parsed_args.forgetting = element
     result = runExperiment(parsed_args)
     activation_list.append(result[0])
     converged_list.append(result[2])
 
-  legend_names = ["Support", "$No support"]
-  plotAverageActivity(activation_list, converged_list, legend_names, name="output_support")
+  legend_names = ["$\phi$= 0.0", "$\phi$ = 0.1", "$\phi$ = 0.2"]
+  plotAverageActivity(activation_list, converged_list, legend_names, name="forgetting")
 
+  print  "learning rate"
+  parsed_args.forgetting = 0.1
+  learning_rate = [0.01, 0.05, 0.001]
+  activation_list = []
+  converged_list = []
 
+  for element in learning_rate:
+    parsed_args.learning_rate = element
+    result = runExperiment(parsed_args)
+    activation_list.append(result[0])
+    converged_list.append(result[2])
+
+  legend_names = ["$\\alpha$= 0.01", "$\\alpha$ = 0.05", "$\\alpha$ = 0.001"]
+  plotAverageActivity(activation_list, converged_list, legend_names, name="learning_rate")
