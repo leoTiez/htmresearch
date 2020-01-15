@@ -503,27 +503,27 @@ if __name__ == "__main__":
     useSupport=True
   )
 
-  print "Implementations"
-  parsed_args = initial_args
-  implementations = ["Bayesian", "SummingBayesian"]
-  activation_list = []
-  converged_list = []
+  # print "Implementations"
+  # parsed_args = initial_args
+  # implementations = ["Bayesian", "SummingBayesian"]
+  # activation_list = []
+  # converged_list = []
   time_diff = 0
   counter = 0
-
-  start = time.time()
-  for element in implementations:
-    parsed_args.implementation = element
-    result = runExperiment(parsed_args)
-    activation_list.append(result[0])
-    converged_list.append(result[2])
-    counter += 1
-
-  end = time.time()
-  time_diff += end - start
-
-  legend_names = ["Incremental", "Summing"]
-  plotAverageActivity(activation_list, converged_list, legend_names, name="incremental_summing")
+  #
+  # start = time.time()
+  # for element in implementations:
+  #   parsed_args.implementation = element
+  #   result = runExperiment(parsed_args)
+  #   activation_list.append(result[0])
+  #   converged_list.append(result[2])
+  #   counter += 1
+  #
+  # end = time.time()
+  # time_diff += end - start
+  #
+  # legend_names = ["Incremental", "Summing"]
+  # plotAverageActivity(activation_list, converged_list, legend_names, name="incremental_summing")
 
   print  "Apical"
   parsed_args = initial_args
@@ -545,7 +545,7 @@ if __name__ == "__main__":
   plotAverageActivity(activation_list, converged_list, legend_names, name="apical")
 
   print  "Average activity 5"
-  parsed_args = initial_args
+  parsed_args.useApicalTiebreak = True
   activation_list = []
   converged_list = []
 
