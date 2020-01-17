@@ -39,7 +39,6 @@ from htmresearch.frameworks.layers.object_machine_factory import (
 )
 
 import argparse
-import time
 
 def str2bool(v):
   if isinstance(v, bool):
@@ -60,8 +59,10 @@ def parse_cmd():
     parser.add_argument('--cellCount', type=int)
     parser.add_argument('--sdrSize', type=int)
     parser.add_argument('--outputActivation', type=float)
+    parser.add_argument('--iterations', type=int)
     parser.add_argument('--useSupport', type=str2bool)
     parser.add_argument('--useApicalTiebreak', type=str2bool)
+    parser.add_argument('--plot', type=str2bool)
 
     parsed_args = parser.parse_args()
 
@@ -363,7 +364,7 @@ def runExperiment(arguments):
       L4Overrides=L4Overrides,
       numCorticalColumns=1,
       maxSegmentsPerCell=maxNumSegments,
-      numLearningPoints=7,
+      numLearningPoints= 7 if arguments.iterations is None else arguments.iterations,
       seed=1
     )
   else:
@@ -415,11 +416,16 @@ def runExperiment(arguments):
   l2ActiveValuesRepresentation = []
   for sensation in sensationStepsSingleColumn:
     exp1.infer([sensation], objectName=objectId, reset=False)
-    l2ActiveCellsSingleColumn.append(exp1.getL2Prediction())
-    cellActivity = exp1.getActiveCellValues()[0]
-    l2ActiveValuesRepresentation.append(cellActivity[list(exp1.objectL2Representations[objectId][0])])
-    l2ActiveValues.append(cellActivity)
-    L2ActiveCellNVsTimeSingleColumn.append(len(exp1.getL2Prediction()[0]))
+    if 'Bayesian' in arguments.implementation:
+      l2ActiveCellsSingleColumn.append(exp1.getL2Prediction())
+      cellActivity = exp1.getActiveCellValues()[0]
+      l2ActiveValuesRepresentation.append(cellActivity[list(exp1.objectL2Representations[objectId][0])])
+      l2ActiveValues.append(cellActivity)
+      L2ActiveCellNVsTimeSingleColumn.append(len(exp1.getL2Prediction()[0]))
+    else:
+      rep = exp1.getL2Representations()
+      l2ActiveCellsSingleColumn.append(rep)
+      L2ActiveCellNVsTimeSingleColumn.append(len(rep[0]))
 
   # Used to figure out where to put the red rectangle!
   sdrSize = exp1.config["L2Params"]["sdrSize"]
@@ -443,93 +449,43 @@ def runExperiment(arguments):
       overlap = len(l2Representation.intersection(object))
       print "\tTo object %s is %s/%s" % (i, overlap, len(l2Representation))
 
-  return l2ActiveValuesRepresentation, l2ActiveValues, converged
-  #
-  # print "First Object representation", np.sort(list(firstObjectRepresentation))
-  #
-  # print "\n\nL2 Output over steps"
-  # for idx in range(0, len(l2ActiveCellsSingleColumn)):
-  #   rep = np.sort(list(l2ActiveCellsSingleColumn[idx][0]))
-  #   print len(rep), rep
-  # print "\n\nObject representations L2"
-  # for idx in range(0, len(exp1.objectL2Representations)):
-  #   obj = np.sort(list(exp1.objectL2Representations[idx][0]))
-  #   print len(obj), obj
-
-  # plotActivity(l2ActiveCellsSingleColumn, singleColumnHighlight)
-  # plotL2ObjectRepresentations(exp1)
-
-  # Multi column experiment
-  # exp3 = L4L2Experiment(
-  #   'three_column',
-  #   numCorticalColumns=3,
-  #   seed=1
-  # )
-  #
-  # print "train multi-column "
-  # exp3.learnObjects(objects)
-  #
-  # print "inference: multi-columns "
-  # exp3.sendReset()
-  # l2ActiveCellsMultiColumn = []
-  # L2ActiveCellNVsTimeMultiColumn = []
-  # for sensation in sensationStepsMultiColumn:
-  #   exp3.infer([sensation], objectName=objectId, reset=False)
-  #   l2ActiveCellsMultiColumn.append(exp3.getL2Representations())
-  #   activeCellNum = 0
-  #   for c in range(numColumns):
-  #     activeCellNum += len(exp3.getL2Representations()[c])
-  #   L2ActiveCellNVsTimeMultiColumn.append(activeCellNum / numColumns)
-  #
-  # sdrSize = exp3.config["L2Params"]["sdrSize"]
-  # multiColumnHighlight = next(
-  #   (idx for idx, value in enumerate(l2ActiveCellsMultiColumn)
-  #    if len(value[0]) == sdrSize), None)
-  #
-  # plotActivity(l2ActiveCellsMultiColumn, multiColumnHighlight)
-
+  if 'Bayesian' in arguments.implementation:
+    return l2ActiveValuesRepresentation, l2ActiveValues, converged
+  else:
+    return None
 
 
 if __name__ == "__main__":
-  initial_args = argparse.Namespace(
-    implementation="Bayesian",
-    learningRate=0.01,
-    forgetting=0.1,
-    outputCount=128,
-    sdrSize=5,
-    outputActivation=0.3,
-    cellCount=8,
-    useApicalTiebreak=True,
-    useSupport=True
-  )
+  parsed_args = parse_cmd()
+  if parsed_args.plot is None:
+    runExperiment(parsed_args)
 
-  print  "Forgetting"
-  parsed_args = initial_args
-  parsed_args.outputActivation = 0.3
-  forgetting = [0.0, 0.1, 0.2]
-  activation_list = []
-  converged_list = []
+  else:
+    initial_args = argparse.Namespace(
+      implementation="Bayesian",
+      learningRate=0.01,
+      forgetting=0.1,
+      outputCount=128,
+      sdrSize=5,
+      outputActivation=0.3,
+      cellCount=8,
+      useApicalTiebreak=True,
+      useSupport=True,
+      iterations=None
+    )
 
-  for element in forgetting:
-    parsed_args.forgetting = element
-    result = runExperiment(parsed_args)
-    activation_list.append(result[0])
-    converged_list.append(result[2])
+    print "Forgetting"
+    parsed_args = initial_args
+    parsed_args.outputActivation = 0.3
+    forgetting = [0.0, 0.1, 0.2]
+    activation_list = []
+    converged_list = []
 
-  legend_names = ["$\phi$= 0.0", "$\phi$ = 0.1", "$\phi$ = 0.2"]
-  plotAverageActivity(activation_list, converged_list, legend_names, name="forgetting")
+    for element in forgetting:
+      parsed_args.forgetting = element
+      result = runExperiment(parsed_args)
+      activation_list.append(result[0])
+      converged_list.append(result[2])
 
-  print  "learning rate"
-  parsed_args.forgetting = 0.1
-  learning_rate = [0.01, 0.05, 0.001]
-  activation_list = []
-  converged_list = []
-
-  for element in learning_rate:
-    parsed_args.learning_rate = element
-    result = runExperiment(parsed_args)
-    activation_list.append(result[0])
-    converged_list.append(result[2])
-
-  legend_names = ["$\\alpha$= 0.01", "$\\alpha$ = 0.05", "$\\alpha$ = 0.001"]
-  plotAverageActivity(activation_list, converged_list, legend_names, name="learning_rate")
+    legend_names = ["$\phi$= 0.0", "$\phi$ = 0.1", "$\phi$ = 0.2"]
+    plotAverageActivity(activation_list, converged_list, legend_names, name="forgetting")
