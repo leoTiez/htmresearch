@@ -476,7 +476,6 @@ if __name__ == "__main__":
 
     print "Forgetting"
     parsed_args = initial_args
-    parsed_args.outputActivation = 0.3
     forgetting = [0.0, 0.1, 0.2]
     activation_list = []
     converged_list = []
