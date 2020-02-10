@@ -283,6 +283,8 @@ def plotAverageActivity(activities_over_time, converged_list, legend_names, name
   for activity_over_time, converged, legend_name in zip(activities_over_time, converged_list, legend_names):
     average_cell_activity = np.asarray(np.mean(activity_over_time, axis=1))
     plt.plot(range(1, average_cell_activity.shape[0] + 1), average_cell_activity, label=legend_name)
+    plt.xticks(range(1, average_cell_activity.shape[0] + 1))
+    plt.axis((1, 5, 0.25, 0.45))
     if converged is not None:
       plt.plot(converged + 1, average_cell_activity[converged], 'o')
   plt.xlabel('Sensation')
@@ -376,6 +378,12 @@ def runExperiment(arguments):
       seed=1
     )
 
+  objects_without_target = [sens_set for num, sens_set in enumerate(objectMachine.objects.values()) if num != 2]
+  counts = np.zeros(len(objectMachine.objects[2]))
+  for num, pair in enumerate(objectMachine.objects[2]):
+    for sens_set in objects_without_target:
+      counts[num] += sens_set.count(pair)
+  print counts
   print "train single column "
   exp1.learnObjects(objectsSingleColumn)
 
@@ -488,3 +496,43 @@ if __name__ == "__main__":
 
     legend_names = ["$\phi$= 0.0", "$\phi$ = 0.1", "$\phi$ = 0.2"]
     plotAverageActivity(activation_list, converged_list, legend_names, name="forgetting")
+
+    print "Output activation threshold"
+    parsed_args.forgetting = 0.1
+    output_threshold = [0.1, 0.2, 0.3, 0.5]
+    activation_list = []
+    converged_list = []
+    legend_names = []
+    for element in output_threshold:
+      parsed_args.outputActivation = element
+      try:
+        result = runExperiment(parsed_args)
+      except:
+        print "Couldn't infer object with output activation of ", str(element)
+        continue
+      activation_list.append(result[0])
+      converged_list.append(result[2])
+      legend_names.append("$\\theta_o$ = " + str(element))
+
+    plotAverageActivity(activation_list, converged_list, legend_names, name="output_act")
+
+    print "Learning rate"
+    parsed_args.outputActivation = 0.3
+    learning_rates = [0.001, 0.01, 0.1]
+    activation_list = []
+    converged_list = []
+    legend_names = []
+
+    for element in learning_rates:
+      parsed_args.learningRate = element
+      try:
+        result = runExperiment(parsed_args)
+      except:
+        print "Couldn't infer object with learning rate of ", str(element)
+        continue
+      activation_list.append(result[0])
+      converged_list.append(result[2])
+      legend_names.append("$\\alpha$ = " + str(element))
+
+
+    plotAverageActivity(activation_list, converged_list, legend_names, name="learning_rate")
