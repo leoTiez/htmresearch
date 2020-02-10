@@ -488,3 +488,42 @@ if __name__ == "__main__":
 
     legend_names = ["$\phi$= 0.0", "$\phi$ = 0.1", "$\phi$ = 0.2"]
     plotAverageActivity(activation_list, converged_list, legend_names, name="forgetting")
+
+    print "Output activation threshold"
+    parsed_args.forgetting = 0.1
+    output_threshold = [0.1, 0.2, 0.3, 0.5]
+    activation_list = []
+    converged_list = []
+    legend_names = []
+    for element in output_threshold:
+      parsed_args.outputActivation = element
+      try:
+        result = runExperiment(parsed_args)
+      except:
+        print "Couldn't infer object with output activation of ", str(element)
+        continue
+      activation_list.append(result[0])
+      converged_list.append(result[2])
+      legend_names.append("$\\theta_o$ = " + str(element))
+
+    plotAverageActivity(activation_list, converged_list, legend_names, name="output_act")
+
+    print "Learning rate"
+    parsed_args.outputActivation = 0.3
+    learning_rates = [0.001, 0.01, 0.1]
+    activation_list = []
+    converged_list = []
+    legend_names = []
+
+    for element in learning_rates:
+      parsed_args.learningRate = element
+      try:
+        result = runExperiment(parsed_args)
+      except:
+        print "Couldn't infer object with learning rate of ", str(element)
+        continue
+      activation_list.append(result[0])
+      converged_list.append(result[2])
+      legend_names.append("$\\alpha$ = " + str(element))
+
+    plotAverageActivity(activation_list, converged_list, legend_names, name="learning_rate")
