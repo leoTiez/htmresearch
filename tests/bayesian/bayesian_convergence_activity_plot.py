@@ -278,17 +278,21 @@ def plotL2ObjectRepresentations(exp1):
                                 filename='plots/target_object_representations.pdf',
                                 scale=4)
 
+
 def plotAverageActivity(activities_over_time, converged_list, legend_names, name="tiebreak_support_test"):
-  plt.clf()
-  for activity_over_time, converged, legend_name in zip(activities_over_time, converged_list, legend_names):
-    average_cell_activity = np.asarray(np.mean(activity_over_time, axis=1))
-    plt.plot(range(1, average_cell_activity.shape[0] + 1), average_cell_activity, label=legend_name)
-    if converged is not None:
-      plt.plot(converged + 1, average_cell_activity[converged], 'o')
-  plt.xlabel('Sensation')
-  plt.ylabel('Activity')
-  plt.legend()
-  plt.savefig('%s.png' % name)
+    plt.clf()
+    for activity_over_time, converged, legend_name in zip(activities_over_time, converged_list, legend_names):
+      average_cell_activity = np.asarray(np.mean(activity_over_time, axis=1))
+      plt.plot(range(1, average_cell_activity.shape[0] + 1), average_cell_activity, label=legend_name)
+      plt.xticks(range(1, average_cell_activity.shape[0] + 1))
+      plt.axis((1, 5, 0.25, 0.45))
+      if converged is not None:
+        plt.plot(converged + 1, average_cell_activity[converged], 'o')
+    plt.xlabel('Sensation')
+    plt.ylabel('Activity')
+    plt.legend()
+    plt.savefig('%s.png' % name)
+
 
 def runExperiment(arguments):
   """
