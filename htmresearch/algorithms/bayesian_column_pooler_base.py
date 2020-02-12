@@ -56,6 +56,7 @@ class BayesianColumnPoolerBase(object):
             noise=0.01,  # lambda
             activationThreshold=0.5, # probability such that a cell becomes active
             forgetting=0.1,
+            predictionThreshold=0.01,
             useSupport=False,
             avoidWeightExplosion=True,
             resetProximalCounter=False,
@@ -163,6 +164,7 @@ class BayesianColumnPoolerBase(object):
         self.sampleSizeDistal = sampleSizeDistal
         self.inertiaFactor = inertiaFactor
 
+        self.predictionThreshold = predictionThreshold
         self.prevActiveCells = np.zeros(self.cellCount, dtype="float64")
         self.activeCells = np.zeros(self.cellCount, dtype="float64")
         self.activePredictionCells = np.zeros(self.cellCount, dtype="float64")
@@ -479,7 +481,7 @@ class BayesianColumnPoolerBase(object):
         # If support is used, activity is no probabilities anymore
         # THus the threshold can be lower than 0
         activity = self.activeCells if not self.useSupport else self.activePredictionCells
-        threshold = 0.01 if activity[activity > 0.01].shape[0] > 0 else 0.0 # if not self.useSupport else np.NINF
+        threshold = self.predictionThreshold if activity[activity > self.predictionThreshold].shape[0] > 0 else 0.0
 
         # No probabilities anymore, thus do not filter for values greater than 0
         zippedActivation = filter(lambda x: x[1] > threshold, zip(range(len(activity)), activity))
