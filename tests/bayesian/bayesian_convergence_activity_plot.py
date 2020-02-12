@@ -490,6 +490,7 @@ if __name__ == "__main__":
       iterations=None
     )
 
+
     print "Forgetting"
     parsed_args = initial_args
     forgetting = [0.0, 0.1, 0.2]

@@ -159,27 +159,22 @@ class BayesianSummingColumnPooler(BayesianColumnPoolerBase):
             seed=seed
         )
 
-        self.distalConnectionCounts = list(np.zeros((self.cellCount, n)) for n in lateralInputWidths)
-        self.internalDistalConnectionCount = np.zeros((self.cellCount, self.cellCount))
-        self.proximalConnectionCount = np.zeros((self.cellCount, self.inputWidth))
+        self.distalConnectionCounts = list(np.zeros((self.cellCount, n), dtype='float16') for n in lateralInputWidths)
+        self.internalDistalConnectionCount = np.zeros((self.cellCount, self.cellCount), dtype='float16')
+        self.proximalConnectionCount = np.zeros((self.cellCount, self.inputWidth), dtype='float16')
 
-        self.distalCellActivityCounts = list(np.zeros(self.cellCount) for n in lateralInputWidths)
-        self.internalDistalCellActivityCount = np.zeros(self.cellCount)
-        self.proximalCellActivityCount = np.zeros(self.cellCount)
+        self.distalCellActivityCounts = list(np.zeros(self.cellCount, dtype='float16') for _n in lateralInputWidths)
+        self.internalDistalCellActivityCount = np.zeros(self.cellCount, dtype='float16')
+        self.proximalCellActivityCount = np.zeros(self.cellCount, dtype='float16')
 
-        self.distalInputCounts = list(np.zeros(n) for n in lateralInputWidths)
-        self.proximalInputCount = np.zeros(self.inputWidth)
+        self.distalInputCounts = list(np.zeros(n, dtype='float16') for n in lateralInputWidths)
+        self.proximalInputCount = np.zeros(self.inputWidth, dtype='float16')
 
         self.updateCounter = 0
         self.numberOfObjects = 0
 
     def _beforeUpdate(self, connectionIndicator):
         pass
-        # if connectionIndicator == self.CONNECTION_ENUM["internalDistal"]:
-        #     if self.avoidWeightExplosion:
-        #         self.updateCounter = 0
-        #     if self.resetProximalCounter:
-        #         self._resetProximalCounter()
 
     def _updateConnectionData(self, connectionIndicator, **kwargs):
         if connectionIndicator == self.CONNECTION_ENUM["proximal"]:
@@ -283,7 +278,7 @@ class BayesianSummingColumnPooler(BayesianColumnPoolerBase):
     ###################################################################################################################
 
     def _resetProximalCounter(self):
-        self.proximalConnectionCount = np.zeros(self.proximalConnectionCount.shape)
-        self.proximalCellActivityCount = np.zeros(self.proximalCellActivityCount.shape)
-        self.proximalInputCount = np.zeros(self.proximalInputCount.shape)
+        self.proximalConnectionCount = np.zeros(self.proximalConnectionCount.shape, dtype='float16')
+        self.proximalCellActivityCount = np.zeros(self.proximalCellActivityCount.shape, dtype='float16')
+        self.proximalInputCount = np.zeros(self.proximalInputCount.shape, dtype='float16')
 

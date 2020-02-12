@@ -130,10 +130,14 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemoryBase)
             self.initMovingAverages
         )
 
-        self.basalMovingAveragesBias = np.full((self.numBasalSegments, self.numberOfCells()), self.initMovingAverages)
-        self.apicalMovingAveragesBias = np.full((self.numApicalSegments, self.numberOfCells()), self.initMovingAverages)
-        self.basalMovingAverageInput = np.full(self.basalInputSize, self.initMovingAverages)
-        self.apicalMovingAverageInput = np.full(self.apicalInputSize, self.initMovingAverages)
+        self.basalMovingAveragesBias = np.full(
+            (self.numBasalSegments, self.numberOfCells()), self.initMovingAverages, dtype='float16'
+        )
+        self.apicalMovingAveragesBias = np.full(
+            (self.numApicalSegments, self.numberOfCells()), self.initMovingAverages, dtype='float16'
+        )
+        self.basalMovingAverageInput = np.full(self.basalInputSize, self.initMovingAverages, dtype='float16')
+        self.apicalMovingAverageInput = np.full(self.apicalInputSize, self.initMovingAverages, dtype='float16')
 
     def _addNewSegments(self, isBasal=True):
         input_size = self.basalInputSize if isBasal else self.apicalInputSize
@@ -153,13 +157,19 @@ class BayesianApicalTiebreakPairMemory(ApicalTiebreakBayesianTemporalMemoryBase)
              numSegments) = self._getApicalConnectionData()
 
         if numSegments <= self.maxSegmentsPerCell:
-            weight_matrix = np.append(weight_matrix, np.full((1, self.numberOfCells(), input_size), 0), axis=0)
-            average_matrix = np.append(average_matrix, np.full((1, self.numberOfCells(), input_size),
-                                                               self.initMovingAverages), axis=0)
-            bias_matrix = np.append(bias_matrix, np.full((1, self.numberOfCells()), 0), axis=0)
-            bias_average = np.append(bias_average, np.full((1, self.numberOfCells()),
-                                                           self.initMovingAverages), axis=0)
-            active_segments = np.append(active_segments, np.full((1, self.numberOfCells()), 0), axis=0)
+            weight_matrix = np.append(weight_matrix,
+                                      np.full((1, self.numberOfCells(), input_size), 0, dtype='float16'),
+                                      axis=0)
+            average_matrix = np.append(average_matrix,
+                                       np.full((1, self.numberOfCells(), input_size),
+                                               self.initMovingAverages,
+                                               dtype='float16'),
+                                       axis=0)
+            bias_matrix = np.append(bias_matrix, np.full((1, self.numberOfCells()), 0, dtype='float16'), axis=0)
+            bias_average = np.append(bias_average,
+                                     np.full((1, self.numberOfCells()), self.initMovingAverages, dtype='float16'),
+                                     axis=0)
+            active_segments = np.append(active_segments, np.full((1, self.numberOfCells()), 0, dtype='float16'), axis=0)
             numSegments += 1
 
         if isBasal:
