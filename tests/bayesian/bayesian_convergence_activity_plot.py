@@ -280,14 +280,17 @@ def plotL2ObjectRepresentations(exp1):
 
 
 def plotAverageActivity(activities_over_time, converged_list, legend_names, name="tiebreak_support_test"):
+    colors = ['blue', 'green', 'orange', 'red', 'cyan', "purple", "olive", "grey"]
     plt.clf()
-    for activity_over_time, converged, legend_name in zip(activities_over_time, converged_list, legend_names):
+
+    for num, (activity_over_time, converged, legend_name) in enumerate(zip(activities_over_time, converged_list, legend_names)):
+      color = colors[num]
       average_cell_activity = np.asarray(np.mean(activity_over_time, axis=1))
-      plt.plot(range(1, average_cell_activity.shape[0] + 1), average_cell_activity, label=legend_name)
+      plt.plot(range(1, average_cell_activity.shape[0] + 1), average_cell_activity, label=legend_name, color=color)
       plt.xticks(range(1, average_cell_activity.shape[0] + 1))
-      plt.axis((1, 5, 0.25, 0.45))
+      plt.axis((1, 5, 0., 1.))
       if converged is not None:
-        plt.plot(converged + 1, average_cell_activity[converged], 'o')
+        plt.plot(converged + 1, average_cell_activity[converged], 'o', color=color)
     plt.xlabel('Sensation')
     plt.ylabel('Activity')
     plt.legend()
@@ -335,7 +338,7 @@ def runExperiment(arguments):
   L2Overrides = {
     "noise": 1e-10,
     "cellCount": outputCells, # new: 256 # original: 4096
-    "inputWidth": 2048 * cellsPerColumn, # new: 8192 # original: 16384 (?)
+    "inputWidth": 1024 * cellsPerColumn, # new: 8192 # original: 16384 (?)
     "activationThreshold": arguments.outputActivation,
     "sdrSize": arguments.sdrSize,
     "forgetting": arguments.forgetting,
@@ -348,7 +351,7 @@ def runExperiment(arguments):
   L4Overrides = {
     "noise": 1e-10,
     "cellsPerColumn": cellsPerColumn, # new: 4 # original 32
-    "columnCount": 2048, # new: 2048 # original: 2048
+    "columnCount": 1024, # new: 2048 # original: 2048
     "initMovingAverages": 1/float(2048 * cellsPerColumn),
     "minThreshold": 1/float(cellsPerColumn),
     "useApicalTiebreak": arguments.useApicalTiebreak
@@ -418,6 +421,15 @@ def runExperiment(arguments):
   L2ActiveCellNVsTimeSingleColumn = []
   l2ActiveValues = []
   l2ActiveValuesRepresentation = []
+
+  target = objectMachine.objects[2]
+  objects_but_target = [element for element in objectMachine.objects.values() if element is not target]
+  counts = np.zeros(len(target))
+  for num, pair in enumerate(target):
+    for in_object in objects_but_target:
+      counts[num] += in_object.count(pair)
+  print  "The feaure-location pairs are shared as follows: ", counts
+
   for sensation in sensationStepsSingleColumn:
     exp1.infer([sensation], objectName=objectId, reset=False)
     if 'Bayesian' in arguments.implementation:
@@ -461,7 +473,7 @@ def runExperiment(arguments):
 
 if __name__ == "__main__":
   parsed_args = parse_cmd()
-  if parsed_args.plot is None:
+  if parsed_args.cellCount is not None:
     runExperiment(parsed_args)
 
   else:
@@ -512,6 +524,7 @@ if __name__ == "__main__":
 
     plotAverageActivity(activation_list, converged_list, legend_names, name="output_act")
 
+
     print "Learning rate"
     parsed_args.outputActivation = 0.3
     learning_rates = [0.001, 0.01, 0.1]
@@ -531,3 +544,65 @@ if __name__ == "__main__":
       legend_names.append("$\\alpha$ = " + str(element))
 
     plotAverageActivity(activation_list, converged_list, legend_names, name="learning_rate")
+
+    print "Implementation type"
+    parsed_args.learningRate = 0.01
+    implementations = ["Bayesian", "SummingBayesian"]
+    activation_list = []
+    converged_list = []
+
+    for element in implementations:
+      parsed_args.implementation = element
+      result = runExperiment(parsed_args)
+      activation_list.append(result[0])
+      converged_list.append(result[2])
+
+    legend_names = ["Bayesian", "SummingBayesian"]
+    plotAverageActivity(activation_list, converged_list, legend_names, name="summing_inc")
+
+    print "Use apical support"
+    parsed_args.implementation = "Bayesian"
+    use_apical = [True, False]
+    activation_list = []
+    converged_list = []
+
+    for element in use_apical:
+      parsed_args.useApicalTiebreak = element
+      result = runExperiment(parsed_args)
+      activation_list.append(result[0])
+      converged_list.append(result[2])
+
+    legend_names = ["Use apical support", "No apical support"]
+    plotAverageActivity(activation_list, converged_list, legend_names, name="apical_support")
+
+    print "Average activity"
+    parsed_args.useApicalTiebreak = True
+    activation_list = []
+    converged_list = []
+
+    result = runExperiment(parsed_args)
+    activation_list.append(result[0])
+    activation_list.append(result[1])
+    converged_list.append(result[2])
+    converged_list.append(result[2])
+
+    parsed_args.learningRate = 0.001
+    result = runExperiment(parsed_args)
+    activation_list.append(result[0])
+    activation_list.append(result[1])
+    converged_list.append(result[2])
+    converged_list.append(result[2])
+
+    parsed_args.learningRate = 0.01
+    parsed_args.outputActivation = 0.1
+    result = runExperiment(parsed_args)
+    activation_list.append(result[0])
+    activation_list.append(result[1])
+    converged_list.append(result[2])
+    converged_list.append(result[2])
+
+    legend_names = ["Default average pattern", "Default average all",
+                    "$\\alpha$=0.001 average pattern", "$\\alpha$=0.001 average all",
+                    "$\\theta_o$=0.1 average pattern", "$\\theta_o$=0.1 average all"
+                    ]
+    plotAverageActivity(activation_list, converged_list, legend_names, name="average_activity")
