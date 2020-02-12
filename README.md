@@ -1,95 +1,45 @@
-Open Research?
-==============
+# Incorporating A Continuous Bayesian Learning Rule Into A Discrete Hierarchical Temporal Model
 
-We have released all our commercial HTM algorithm code to the open source 
-community within NuPIC. We use that code in our product. The NuPIC
-open source community and Numenta continues to maintain and improve that 
-regularly. 
+This repository contains the Python code that was used to extend Numenta's HTM approach
+to a continuous stochastical network that embeds a Hebbian-like Bayesian learning rule
+to adapt to changing input statistics. The project was conducted within the research
+class DD2465 at KTH.
 
-Internally though we continue to evolve and expand the ideas towards a 
-full blown cortical framework. Those research ideas are constantly in flux as
-we tweak and experiment. To go along with that we have a separate experimental 
-codebase that sits on top of NuPIC.   
+The goal is to compare the approaches regarding their respective convergence behavior.
+We hypothesised that the network will achieve similar results, while increasing
+interpretability and reducing the number of model parameters that are needed to be tuned.
 
-We get a lot of questions about it. As such we wondered whether it is 
-possible to be even more open about that work.  Could we release our day 
-to day research code in a public repository? Would people get confused? Would
-it slow us down? 
+Unfortunately, we could verify our claim. The algorithm comes with the drawback of
+large computational costs for both, memory and time consumption. Moreover, we could not
+obtain a similar performance as the original model (measured in number of sensation-location
+pairs needed to infer correctly an object).
 
-We discussed these tradeoffs on the NuPIC mailing list. Based on that 
-discussion, we decided to go ahead and create `nupic.research` It contains 
-the code for experimental algorithm work done internally at Numenta.
+Nevertheless, we are convinced that the work opens a new way to investigate thoroughly 
+the dynamical behaviour of the network. Moreover, the output activity of the neurons of
+the object representation can be seen as a measure of confidence. Thus, we believe
+that with a larger time frame it is possible to tune the performance of the Bayesian
+version to be similar to the original approach, while increasing interpretability.
 
-The code includes prototypes and experiments with different algorithm 
-implementations. This is all temporary, ever-changing experimental code, 
-which poses some challenges.
+The original README that was published by Numenta can be found [here](NumentaREADME.md)
 
-Hence the following **DISCLAIMERS**:
+## Installation
+To install the project, change to the project directory and run 
+```bash
+pip install .
+```  
 
- 
-What you should understand about this repository
-================================================
+## Execution
+The first file for a large parameter search can be executed via
+```bash
+python experiments.py
+```
 
-- the contents can change without warning or explanation
-- the code will change quickly as experiments are discarded and recreated
-- it might not change at all for a while
-- it could just be plain wrong or buggy for periods of time
-- code will not be production-quality and might be embarrassing
-- comments and questions about this code may be ignored
-- Numenta is under no obligation to properly document or explain this
-codebase or follow any understandable process
-- repository will be read-only to the public
-- if we do work with external partners, that work will probably NOT be here
-- we might decide at some point to not do our research in the open anymore and 
-instead delete the whole repository
+The other file that creates the plots is run through the command
+```bash
+python tests/bayesian/bayesian_conergence_activity_plot.py
+```
 
-We want to be as transparent as possible, but we also want to move
-fast with these experiments so the finalized algorithms can be
-included into NuPIC as soon as they are ready. We really hope this repository
-is helpful and does not instead create a lot of confusion about what's coming
-next.  
-
-
-Installation
-============
-
-OK, enough caveats. Here are some installation instructions though mostly you
-are on your own. (Wait, was that another caveat?)
-
-Requirements:
-
-- `nupic` and `nupic.core`
-  - `pip install nupic --user` should be sufficient
-- `htmresearch-core`
-  - To install, follow the instructions in the
-    [htmresearch-core README](https://github.com/numenta/htmresearch-core).
-- Various individual projects may have other requirements. We don't formally
-  spell these out but two common ones are pandas and plotly.
-
-Install using setup.py like any python project. Since the contents here change
-often, we highly recommend installing as follows:
-
-    python setup.py develop --user
-
-After this you can test by importing from htmresearch:
-
-    python
-    from htmresearch.algorithms.apical_tiebreak_temporal_memory import ApicalTiebreakPairMemory
-
-If this works installation probably worked fine. BTW, the above class is a
-modified version of TemporalMemory that we are currently researching. It
-includes support for feedback connections (through apical dendrites) and
-external distal basal connections.
-
-You can perform a more thorough test by running the test script from the repository root:
-
-    %> ./run_tests.sh 
-
-
-Archive
-=======
-
-Some of our old research code and experiments are archived in the following repository: 
- 
-* https://github.com/numenta-archive/htmresearch
-
+## Contribution
+Please feel free to contribute the work of [Numenta](https://numenta.com/) and to our own
+adaptions. Clone, fork and try. For hints and recommendations, don't hesitate to contact
+us via email: llze@kth.se and heyder@kth.se. 
