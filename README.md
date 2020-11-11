@@ -3,7 +3,7 @@
 This repository contains the Python code that was used to extend Numenta's HTM approach
 to a continuous stochastical network that embeds a Hebbian-like Bayesian learning rule
 to adapt to changing input statistics. The project was conducted within the research
-class DD2465 at KTH.
+class DD2465 at KTH, and the report can be found [here](Numenta_BCPNN_Report.pdf).
 
 The goal is to compare the approaches regarding their respective convergence behavior.
 We hypothesised that the network will achieve similar results, while increasing
